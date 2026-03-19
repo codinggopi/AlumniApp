@@ -23,6 +23,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(120), nullable=False)
     role = Column(String(50), nullable=False, index=True)
+    password_hash = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
     department = Column(String(120), nullable=True)
     graduation_year = Column(Integer, nullable=True)
@@ -40,6 +41,8 @@ class User(Base):
     internships = relationship("Internship", foreign_keys="Internship.posted_by")
     applications = relationship("Application", foreign_keys="Application.student_id")
     events = relationship("Event", foreign_keys="Event.created_by")
+    announcements = relationship("Announcement", foreign_keys="Announcement.created_by")
+    notifications = relationship("Notification", foreign_keys="Notification.user_id")
 
 
 class StudentProfile(Base):
@@ -105,6 +108,7 @@ class Internship(Base):
     seats = Column(Integer, default=1, nullable=False)
     deadline = Column(String(50), nullable=True)
     description = Column(Text, nullable=True)
+    status = Column(String(50), default="Open", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     alumni = relationship("User", foreign_keys=[posted_by])
@@ -139,3 +143,28 @@ class Event(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     admin = relationship("User", foreign_keys=[created_by])
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    announcement_id = Column(Integer, primary_key=True, index=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    admin = relationship("User", foreign_keys=[created_by])
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    noti_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
+    type = Column(String(50), nullable=True)  # "message", "connection", "event"
+    message = Column(String(255), nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", foreign_keys=[user_id])
