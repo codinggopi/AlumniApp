@@ -22,7 +22,22 @@ from jose import JWTError, jwt
 
 init_db()
 
-app = FastAPI(title="Alumni App API")
+tags_metadata = [
+    {"name": "auth", "description": "Operations with user authentication and registration."},
+    {"name": "profile", "description": "Manage user profiles and resumes."},
+    {"name": "alumni", "description": "Explore the alumni network directory."},
+    {"name": "internships", "description": "Browse and post internship opportunities."},
+    {"name": "applications", "description": "Track and manage internship applications."},
+    {"name": "messages", "description": "One-to-one communication between members."},
+    {"name": "events", "description": "Platform-wide events and announcements."},
+]
+
+app = FastAPI(
+    title="Alumni-Student Network API",
+    description="Backend API for the Alumni-Student Networking Platform v2.0. Supports JWT authentication, real-time messaging, and internship management.",
+    version="2.0.0",
+    openapi_tags=tags_metadata,
+)
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -137,6 +152,7 @@ class AuthLoginRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: str
     role: str
+    otp: str
     new_password: str
 
 
@@ -285,14 +301,17 @@ def home():
     }
 
 
-@app.post("/send-otp")
+@app.post("/send-otp", tags=["auth"])
 def send_otp(payload: SendOtpRequest):
     send_otp_email(payload.email)
     return {"message": "OTP sent", "expires_in_minutes": 5}
 
 
-@app.post("/auth/register")
-def register_with_password(payload: AuthRegisterRequest, db: Session = Depends(get_db)):
+@app.post("/auth/register", tags=["auth"])
+def register_with_password(payload: AuthRegisterRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can register new users")
+    
     role = ensure_role(payload.role, {"student", "alumni", "admin"})
 
     existing_user = db.query(models.User).filter(models.User.email == payload.email).first()
@@ -326,7 +345,7 @@ def register_with_password(payload: AuthRegisterRequest, db: Session = Depends(g
     }
 
 
-@app.post("/auth/login")
+@app.post("/auth/login", tags=["auth"])
 def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     role = ensure_role(payload.role, {"student", "alumni", "admin"})
     user = db.query(models.User).filter(
@@ -350,8 +369,11 @@ def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)
     }
 
 
-@app.post("/auth/reset-password")
+@app.post("/auth/reset-password", tags=["auth"])
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if not verify_stored_otp(payload.email, payload.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    
     role = ensure_role(payload.role, {"student", "alumni", "admin"})
     user = db.query(models.User).filter(
         models.User.email == payload.email,
@@ -366,7 +388,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     return {"status": "password_updated"}
 
 
-@app.post("/verify-otp")
+@app.post("/verify-otp", tags=["auth"])
 def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
     if not verify_stored_otp(payload.email, payload.otp):
         raise HTTPException(status_code=400, detail="Invalid OTP")
@@ -422,7 +444,7 @@ def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
     }
 
 
-@app.get("/alumni")
+@app.get("/alumni", tags=["alumni"])
 def list_alumni(
     department: Optional[str] = None,
     company: Optional[str] = None,
@@ -447,7 +469,7 @@ def list_alumni(
     return [serialize_alumni(user, profile) for user, profile in results]
 
 
-@app.get("/profile/{user_id}")
+@app.get("/profile/{user_id}", tags=["profile"])
 def get_profile(user_id: int, db: Session = Depends(get_db)):
     user = get_user_by_id(db, user_id)
     data = serialize_user(user)
@@ -476,12 +498,12 @@ def get_profile(user_id: int, db: Session = Depends(get_db)):
     return data
 
 
-@app.get("/auth/me")
+@app.get("/auth/me", tags=["auth"])
 def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return get_profile(current_user.user_id, db)
 
 
-@app.patch("/profile/{user_id}")
+@app.patch("/profile/{user_id}", tags=["profile"])
 def update_profile(user_id: int, payload: ProfileUpdateRequest, db: Session = Depends(get_db)):
     user = get_user_by_id(db, user_id)
     updates = payload_dict(payload)
@@ -533,7 +555,7 @@ def delete_profile(user_id: int, current_user: models.User = Depends(get_current
     return {"status": "deleted"}
 
 
-@app.post("/profile/{user_id}/resume")
+@app.post("/profile/{user_id}/resume", tags=["profile"])
 def upload_resume(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     user = get_user_by_id(db, user_id)
 
@@ -556,7 +578,7 @@ def upload_resume(user_id: int, file: UploadFile = File(...), db: Session = Depe
     return {"status": "uploaded", "resume_url": resume_url}
 
 
-@app.post("/internships")
+@app.post("/internships", tags=["internships"])
 def create_internship(payload: InternshipCreate, db: Session = Depends(get_db)):
     user = get_user_by_id(db, payload.posted_by)
     if user.role != "alumni":
@@ -569,7 +591,7 @@ def create_internship(payload: InternshipCreate, db: Session = Depends(get_db)):
     return {"internship_id": internship.internship_id, "message": "Internship created"}
 
 
-@app.get("/internships")
+@app.get("/internships", tags=["internships"])
 def list_internships(
     role_title: Optional[str] = None,
     location: Optional[str] = None,
@@ -586,7 +608,7 @@ def list_internships(
     return query.order_by(models.Internship.created_at.desc()).all()
 
 
-@app.post("/applications")
+@app.post("/applications", tags=["applications"])
 def apply_for_internship(payload: ApplicationCreate, db: Session = Depends(get_db)):
     student = get_user_by_id(db, payload.student_id)
     internship = get_internship_by_id(db, payload.internship_id)
@@ -608,7 +630,7 @@ def apply_for_internship(payload: ApplicationCreate, db: Session = Depends(get_d
     return {"application_id": application.application_id, "status": application.status}
 
 
-@app.patch("/applications/{application_id}")
+@app.patch("/applications/{application_id}", tags=["applications"])
 def update_application_status(application_id: int, payload: ApplicationStatusUpdate, db: Session = Depends(get_db)):
     allowed_statuses = {"Applied", "Shortlisted", "Rejected", "Selected"}
     if payload.status not in allowed_statuses:
@@ -621,7 +643,7 @@ def update_application_status(application_id: int, payload: ApplicationStatusUpd
     return {"application_id": application.application_id, "status": application.status}
 
 
-@app.patch("/internships/{internship_id}")
+@app.patch("/internships/{internship_id}", tags=["internships"])
 def update_internship(internship_id: int, payload: InternshipCreate, db: Session = Depends(get_db)):
     internship = get_internship_by_id(db, internship_id)
     updates = payload_dict(payload)
@@ -632,7 +654,7 @@ def update_internship(internship_id: int, payload: InternshipCreate, db: Session
     return {"status": "updated"}
 
 
-@app.delete("/internships/{internship_id}")
+@app.delete("/internships/{internship_id}", tags=["internships"])
 def delete_internship(internship_id: int, db: Session = Depends(get_db)):
     internship = get_internship_by_id(db, internship_id)
     db.delete(internship)
@@ -640,7 +662,7 @@ def delete_internship(internship_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@app.delete("/applications/{application_id}")
+@app.delete("/applications/{application_id}", tags=["applications"])
 def delete_application(application_id: int, db: Session = Depends(get_db)):
     application = get_application_by_id(db, application_id)
     db.delete(application)
@@ -648,7 +670,7 @@ def delete_application(application_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@app.get("/applications")
+@app.get("/applications", tags=["applications"])
 def list_applications(
     internship_id: Optional[int] = None,
     student_id: Optional[int] = None,
@@ -662,7 +684,7 @@ def list_applications(
     return query.order_by(models.Application.applied_at.desc()).all()
 
 
-@app.post("/events")
+@app.post("/events", tags=["events"])
 def create_event(payload: EventCreate, db: Session = Depends(get_db)):
     user = get_user_by_id(db, payload.created_by)
     if user.role != "admin":
@@ -675,12 +697,12 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db)):
     return {"event_id": event.event_id, "message": "Event created"}
 
 
-@app.get("/events")
+@app.get("/events", tags=["events"])
 def list_events(db: Session = Depends(get_db)):
     return db.query(models.Event).order_by(models.Event.created_at.desc()).all()
 
 
-@app.patch("/events/{event_id}")
+@app.patch("/events/{event_id}", tags=["events"])
 def update_event(event_id: int, payload: EventCreate, db: Session = Depends(get_db)):
     event = db.query(models.Event).filter(models.Event.event_id == event_id).first()
     if not event:
@@ -699,7 +721,7 @@ def update_event(event_id: int, payload: EventCreate, db: Session = Depends(get_
     return {"status": "updated", "event_id": event.event_id}
 
 
-@app.delete("/events/{event_id}")
+@app.delete("/events/{event_id}", tags=["events"])
 def delete_event(event_id: int, created_by: int, db: Session = Depends(get_db)):
     event = db.query(models.Event).filter(models.Event.event_id == event_id).first()
     if not event:
@@ -714,7 +736,7 @@ def delete_event(event_id: int, created_by: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@app.post("/connections")
+@app.post("/connections", tags=["alumni"])
 def create_connection(payload: ConnectionCreate, db: Session = Depends(get_db)):
     requester = get_user_by_id(db, payload.requester_id)
     receiver = get_user_by_id(db, payload.receiver_id)
@@ -746,7 +768,7 @@ def create_connection(payload: ConnectionCreate, db: Session = Depends(get_db)):
     return {"connection_id": connection.connection_id, "status": connection.status}
 
 
-@app.patch("/connections/{connection_id}")
+@app.patch("/connections/{connection_id}", tags=["alumni"])
 def update_connection_status(connection_id: int, payload: ConnectionStatusUpdate, db: Session = Depends(get_db)):
     allowed_statuses = {"pending", "accepted", "declined"}
     normalized_status = payload.status.lower()
@@ -759,7 +781,7 @@ def update_connection_status(connection_id: int, payload: ConnectionStatusUpdate
     return {"connection_id": connection.connection_id, "status": connection.status}
 
 
-@app.delete("/connections/{connection_id}")
+@app.delete("/connections/{connection_id}", tags=["alumni"])
 def delete_connection(connection_id: int, db: Session = Depends(get_db)):
     connection = get_connection_by_id(db, connection_id)
     db.delete(connection)
@@ -815,7 +837,7 @@ def list_connections(user_id: int, status: Optional[str] = None, db: Session = D
     return query.order_by(models.Connection.created_at.desc()).all()
 
 
-@app.post("/messages")
+@app.post("/messages", tags=["messages"])
 def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
     sender = get_user_by_id(db, payload.sender_id)
     receiver = get_user_by_id(db, payload.receiver_id)
@@ -828,7 +850,7 @@ def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
     return {"message_id": message.message_id, "sent_at": message.sent_at}
 
 
-@app.get("/messages")
+@app.get("/messages", tags=["messages"])
 def list_messages(user_id: int, other_user_id: int, db: Session = Depends(get_db)):
     get_user_by_id(db, user_id)
     get_user_by_id(db, other_user_id)
@@ -856,7 +878,7 @@ def create_notification(payload: NotificationCreate, db: Session = Depends(get_d
     return {"noti_id": notification.noti_id, "message": "Notification created"}
 
 
-@app.get("/notifications")
+@app.get("/notifications", tags=["events"])
 def list_notifications(user_id: int, db: Session = Depends(get_db)):
     get_user_by_id(db, user_id)
     return db.query(models.Notification).filter(models.Notification.user_id == user_id).order_by(models.Notification.created_at.desc()).all()

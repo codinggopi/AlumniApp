@@ -3,3 +3,9 @@ uvicorn
 sqlalchemy
 mysql-connector-python
 python-multipart
+passlib[bcrypt]
+python-jose[cryptography]
+
+# Optional but recommended for production
+email-validator
+python-dotenv
