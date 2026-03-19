@@ -1,17 +1,43 @@
-# alumni_network_app
+# Alumni Network App (Flutter)
 
-A new Flutter project.
+The mobile application for students and alumni, built with **Flutter** and **Provider** for state management.
+
+## Features
+
+- **Modern UI**: Clean and intuitive interface designed for networking.
+- **Multi-Role Support**: Different dashboards and features for Students vs. Alumni.
+- **Searchable Directory**: Find alumni by department, city, or company.
+- **Internship Management**: In-app application tracking and posting for alumni.
+- **Real-time Messaging**: Chat directly with mentors and peers.
+- **Adaptive Design**: Responsive screens for various device sizes.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### 1. Configuration
+Update the `baseUrl` in `lib/services/api_service.dart` to match your server's local IP address:
+```dart
+static const String baseUrl = 'http://[IP_ADDRESS]';
+```
 
-A few resources to get you started if this is your first Flutter project:
+### 2. Install Dependencies
+```bash
+flutter pub get
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### 3. Run the App
+```bash
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Project Directory Structure
+
+- `lib/models/`: Data models for User, Internship, Message, etc.
+- `lib/services/`: API communication services.
+- `lib/providers/`: State management (Auth, etc.).
+- `lib/screens/`: 
+  - `auth/`: Login, Register, OTP screens.
+  - `directory/`: Alumni listing and profiles.
+  - `internships/`: Listing, detail, and posting screens.
+  - `chat/`: Chat rooms.
+  - `events/`: Event feed.
+- `lib/widgets/`: Reusable UI components.
