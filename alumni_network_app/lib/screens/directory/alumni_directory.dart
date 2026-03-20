@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
+import '../../widgets/empty_state.dart';
 import 'profile_detail.dart';
 
 class AlumniDirectoryScreen extends StatefulWidget {
@@ -45,24 +46,31 @@ class _AlumniDirectoryScreenState extends State<AlumniDirectoryScreen> {
       appBar: AppBar(title: const Text('Alumni Directory')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _alumniList.length,
-              itemBuilder: (context, index) {
-                final alumni = _alumniList[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(alumni.fullName),
-                  subtitle: Text('${alumni.department ?? "N/A"} | ${alumni.city ?? "N/A"}'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => ProfileDetailScreen(user: alumni)),
+          : _alumniList.isEmpty
+              ? EmptyStateWidget(
+                  icon: Icons.people_outline,
+                  title: 'No Alumni Found',
+                  message: 'It looks like there are no alumni in the directory yet.',
+                  onRetry: _fetchAlumni,
+                )
+              : ListView.builder(
+                  itemCount: _alumniList.length,
+                  itemBuilder: (context, index) {
+                    final alumni = _alumniList[index];
+                    return ListTile(
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(alumni.fullName),
+                      subtitle: Text('${alumni.department ?? "N/A"} | ${alumni.city ?? "N/A"}'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ProfileDetailScreen(user: alumni)),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
+                ),
     );
   }
 }

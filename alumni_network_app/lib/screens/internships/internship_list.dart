@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../../services/api_service.dart';
 import '../../models/internship.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/empty_state.dart';
 import 'internship_detail.dart';
 import 'post_internship.dart';
 
@@ -52,26 +53,33 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _fetchInternships,
-              child: ListView.builder(
-                itemCount: _internships.length,
-                itemBuilder: (context, index) {
-                  final item = _internships[index];
-                  return Card(
-                    margin: const EdgeInsets.all(8.0),
-                    child: ListTile(
-                      title: Text(item.roleTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${item.companyName} | ${item.location ?? "Remote"}'),
-                      trailing: Text(item.stipend ?? 'Unpaid', style: const TextStyle(color: Colors.green)),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => InternshipDetailScreen(internship: item)),
+              child: _internships.isEmpty
+                  ? EmptyStateWidget(
+                      icon: Icons.work_outline,
+                      title: 'No Internships Available',
+                      message: 'Check back soon for new opportunities or posted by alumni.',
+                      onRetry: _fetchInternships,
+                    )
+                  : ListView.builder(
+                      itemCount: _internships.length,
+                      itemBuilder: (context, index) {
+                        final item = _internships[index];
+                        return Card(
+                          margin: const EdgeInsets.all(8.0),
+                          child: ListTile(
+                            title: Text(item.roleTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('${item.companyName} | ${item.location ?? "Remote"}'),
+                            trailing: Text(item.stipend ?? 'Unpaid', style: const TextStyle(color: Colors.green)),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => InternshipDetailScreen(internship: item)),
+                              );
+                            },
+                          ),
                         );
                       },
                     ),
-                  );
-                },
-              ),
             ),
       floatingActionButton: user?.role == 'alumni'
           ? FloatingActionButton(

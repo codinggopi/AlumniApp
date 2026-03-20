@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
+import '../../widgets/empty_state.dart';
 import 'chat_room_screen.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Future<void> _fetchConversations() async {
     final api = ApiService();
+    setState(() => _isLoading = true);
     try {
       final response = await api.get('/alumni');
       if (response.statusCode == 200) {
@@ -48,7 +50,12 @@ class _InboxScreenState extends State<InboxScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _conversations.isEmpty
-              ? const Center(child: Text('No messages yet. Connect with alumni to start chatting!'))
+              ? EmptyStateWidget(
+                  icon: Icons.chat_bubble_outline,
+                  title: 'No Messages Yet',
+                  message: 'Connect with alumni to start chatting and grow your network!',
+                  onRetry: _fetchConversations,
+                )
               : ListView.separated(
                   itemCount: _conversations.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
