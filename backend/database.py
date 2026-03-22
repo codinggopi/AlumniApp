@@ -33,8 +33,8 @@ def init_db():
         import models
 
     models.Base.metadata.create_all(bind=engine)
-    seed_admin()
     ensure_schema_updates()
+    seed_admin()
 
 
 def seed_admin():
@@ -72,3 +72,44 @@ def ensure_schema_updates():
     if "password_hash" not in user_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
+
+    if "profile_picture_url" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN profile_picture_url VARCHAR(255)"))
+
+    if "current_status" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN current_status VARCHAR(200)"))
+
+    if "events" in inspector.get_table_names():
+        event_columns = {column["name"] for column in inspector.get_columns("events")}
+        
+        if "category" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN category VARCHAR(50) DEFAULT 'event' NOT NULL"))
+
+        if "target_audience" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN target_audience VARCHAR(50) DEFAULT 'all' NOT NULL"))
+
+        if "has_document" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN has_document BOOLEAN DEFAULT 0 NOT NULL"))
+
+        if "has_photos" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN has_photos BOOLEAN DEFAULT 0 NOT NULL"))
+
+        if "document_url" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN document_url VARCHAR(255)"))
+
+        if "photo_url" not in event_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE events ADD COLUMN photo_url VARCHAR(255)"))
+
+    if "student_profiles" in inspector.get_table_names():
+        st_cols = {c["name"] for c in inspector.get_columns("student_profiles")}
+        if "educational_details" not in st_cols:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE student_profiles ADD COLUMN educational_details TEXT"))

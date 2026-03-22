@@ -6,6 +6,10 @@ class Event {
   final String? location;
   final String category;
   final DateTime createdAt;
+  final bool hasDocument;
+  final bool hasPhotos;
+  final String? documentUrl;
+  final String? photoUrl;
 
   Event({
     required this.eventId,
@@ -15,6 +19,10 @@ class Event {
     this.location,
     required this.category,
     required this.createdAt,
+    this.hasDocument = false,
+    this.hasPhotos = false,
+    this.documentUrl,
+    this.photoUrl,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -26,6 +34,10 @@ class Event {
       location: json['location'],
       category: json['category'],
       createdAt: DateTime.parse(json['created_at']),
+      hasDocument: json['has_document'] ?? false,
+      hasPhotos: json['has_photos'] ?? false,
+      documentUrl: json['document_url'],
+      photoUrl: json['photo_url'],
     );
   }
 }

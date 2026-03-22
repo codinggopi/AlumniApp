@@ -12,9 +12,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'student';
+  String? _selectedRole;
   bool _isLoading = false;
   bool _otpSent = false;
+  bool _obscurePassword = true;
 
   void _sendOtp() async {
     if (_emailController.text.isEmpty) return;
@@ -41,7 +42,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final response = await ApiService().post('/auth/reset-password', {
         'email': _emailController.text,
-        'role': _selectedRole,
+        'role': _selectedRole!,
         'otp': _otpController.text,
         'new_password': _passwordController.text,
       });
@@ -81,10 +82,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               DropdownButtonFormField<String>(
                 value: _selectedRole,
                 decoration: const InputDecoration(labelText: 'Select Role', border: OutlineInputBorder()),
+                hint: const Text('Select Role'),
                 items: ['student', 'alumni', 'admin'].map((role) {
                   return DropdownMenuItem(value: role, child: Text(role.toUpperCase()));
                 }).toList(),
-                onChanged: (val) => setState(() => _selectedRole = val!),
+                onChanged: (val) => setState(() => _selectedRole = val),
               ),
               const SizedBox(height: 20),
               _isLoading
@@ -101,8 +103,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const SizedBox(height: 15),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'New Password', border: OutlineInputBorder()),
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                    labelText: 'New Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                    border: const OutlineInputBorder()),
               ),
               const SizedBox(height: 30),
               _isLoading

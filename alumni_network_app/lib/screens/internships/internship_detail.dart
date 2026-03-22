@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../models/internship.dart';
 import '../../services/api_service.dart';
@@ -40,7 +41,11 @@ class InternshipDetailScreen extends StatelessWidget {
       });
 
       if (response.statusCode == 200 && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application submitted!')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Application submitted successfully!')));
+        Navigator.pop(context, true); // Return true to refresh list
+      } else if (context.mounted) {
+        final errorMsg = jsonDecode(response.body)['detail'] ?? 'Failed to apply';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
       }
     }
   }

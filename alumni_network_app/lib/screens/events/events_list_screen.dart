@@ -3,6 +3,10 @@ import 'dart:convert';
 import '../../services/api_service.dart';
 import '../../models/event.dart';
 import '../../widgets/empty_state.dart';
+import '../../providers/auth_provider.dart';
+import 'package:provider/provider.dart';
+import 'event_detail.dart';
+import '../admin/post_event_screen.dart';
 
 class EventsListScreen extends StatefulWidget {
   const EventsListScreen({super.key});
@@ -35,14 +39,63 @@ class _EventsListScreenState extends State<EventsListScreen> {
     } catch (e) {
       debugPrint('Fetch events error: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _confirmDeleteAll(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete ALL Events'),
+        content: const Text('Are you sure you want to delete EVERY event and news item? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAllEvents();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('DELETE ALL', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteAllEvents() async {
+    setState(() => _isLoading = true);
+    final response = await _apiService.delete('/events');
+    if (response.statusCode == 200) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All events cleared')));
+        _fetchEvents();
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to clear events')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = Provider.of<AuthProvider>(context, listen: false).user?.role == 'admin';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Events & News')),
+      appBar: AppBar(
+        title: const Text('Events & News'),
+        actions: [
+          if (isAdmin && _events.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep, color: Colors.red),
+              tooltip: 'Delete All',
+              onPressed: () => _confirmDeleteAll(context),
+            ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _events.isEmpty
@@ -63,13 +116,51 @@ class _EventsListScreenState extends State<EventsListScreen> {
                           event.category == 'event' ? Icons.event : Icons.announcement,
                           color: event.category == 'event' ? Colors.blue : Colors.orange,
                         ),
-                        title: Text(event.title),
-                        subtitle: Text('${event.date ?? "No Date"} | ${event.location ?? "Online"}'),
+                        title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${event.date ?? "No Date"} | ${event.location ?? "Online"}'),
+                            if (event.description != null && event.description!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(event.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (event.hasDocument) Icon(Icons.attachment, size: 20, color: Colors.grey[600]),
+                            if (event.hasPhotos) Icon(Icons.insert_photo, size: 20, color: Colors.grey[600]),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
                         isThreeLine: true,
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => EventDetailScreen(event: event)),
+                          );
+                          if (result == true) _fetchEvents();
+                        },
                       ),
                     );
                   },
                 ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PostEventScreen()),
+                );
+                if (result == true) _fetchEvents();
+              },
+              backgroundColor: Colors.blue,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
     );
   }
 }

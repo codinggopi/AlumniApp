@@ -13,19 +13,48 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'student';
+  String? _selectedRole;
+  bool _obscurePassword = true;
 
-  void _handleLogin() async {
+    void _handleLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (_selectedRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a role.')),
+      );
+      return;
+    }
+
+    // Show loading dialog for 3 seconds
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 20),
+            Text('Logging in...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+          ],
+        ),
+      ),
+    );
+
+    // Artificial wait
+    await Future.delayed(const Duration(seconds: 3));
+
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop(); // Close dialog
+    }
+
     final success = await auth.login(
       _emailController.text,
       _passwordController.text,
-      _selectedRole,
+      _selectedRole!,
     );
 
-    if (success && mounted) {
-      // Navigation is handled by AuthProvider state in main.dart
-    } else if (mounted) {
+    if (mounted && !success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login failed. Please check credentials.')),
       );
@@ -73,12 +102,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 15),
                       TextField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                          border: const OutlineInputBorder(),
                         ),
-                        obscureText: true,
                       ),
                       const SizedBox(height: 15),
                       DropdownButtonFormField<String>(
@@ -87,10 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'I am a...',
                           border: OutlineInputBorder(),
                         ),
+                        hint: const Text('Select Role'),
                         items: ['student', 'alumni', 'admin']
                             .map((role) => DropdownMenuItem(value: role, child: Text(role.toUpperCase())))
                             .toList(),
-                        onChanged: (value) => setState(() => _selectedRole = value!),
+                        onChanged: (value) => setState(() => _selectedRole = value),
                       ),
                       const SizedBox(height: 10),
                       Align(

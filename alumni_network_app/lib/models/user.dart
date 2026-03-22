@@ -8,7 +8,21 @@ class User {
   final int? graduationYear;
   final String? city;
   final String? bio;
+  final String? profilePictureUrl;
+  final String? currentStatus;
   final bool isVerified;
+  
+  // Student specifically
+  final String? educationalDetails;
+  final String? resumeUrl;
+  final String? interests;
+  final String? skills;
+
+  // Alumni specific fields
+  final String? company;
+  final String? jobTitle;
+  final bool? mentorshipAvailable;
+  final String? experienceSummary;
 
   User({
     required this.userId,
@@ -20,7 +34,17 @@ class User {
     this.graduationYear,
     this.city,
     this.bio,
+    this.profilePictureUrl,
+    this.currentStatus,
     this.isVerified = false,
+    this.educationalDetails,
+    this.resumeUrl,
+    this.interests,
+    this.skills,
+    this.company,
+    this.jobTitle,
+    this.mentorshipAvailable,
+    this.experienceSummary,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -34,7 +58,17 @@ class User {
       graduationYear: json['graduation_year'],
       city: json['city'],
       bio: json['bio'],
+      profilePictureUrl: json['profile_picture_url'],
+      currentStatus: json['current_status'],
       isVerified: json['is_verified'] ?? false,
+      educationalDetails: json['educational_details'],
+      resumeUrl: json['resume_url'],
+      interests: json['interests'],
+      skills: json['skills'],
+      company: json['company'],
+      jobTitle: json['job_title'],
+      mentorshipAvailable: json['mentorship_available'],
+      experienceSummary: json['experience_summary'],
     );
   }
 
@@ -49,7 +83,17 @@ class User {
       'graduation_year': graduationYear,
       'city': city,
       'bio': bio,
+      'profile_picture_url': profilePictureUrl,
+      'current_status': currentStatus,
       'is_verified': isVerified,
+      'educational_details': educationalDetails,
+      'resume_url': resumeUrl,
+      'interests': interests,
+      'skills': skills,
+      'company': company,
+      'job_title': jobTitle,
+      'mentorship_available': mentorshipAvailable,
+      'experience_summary': experienceSummary,
     };
   }
 }

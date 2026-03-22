@@ -19,7 +19,10 @@ class ApiService {
   }
 
   Map<String, String> _headers(String? token) {
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -31,24 +34,40 @@ class ApiService {
     return await http.get(
       Uri.parse('$baseUrl$endpoint'),
       headers: _headers(token),
-    );
+    ).timeout(const Duration(seconds: 10));
   }
 
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
+  Future<http.Response> post(String endpoint, dynamic body) async {
     final token = await getToken();
     return await http.post(
       Uri.parse('$baseUrl$endpoint'),
       headers: _headers(token),
       body: jsonEncode(body),
-    );
+    ).timeout(const Duration(seconds: 10));
   }
 
-  Future<http.Response> patch(String endpoint, Map<String, dynamic> body) async {
+  Future<http.Response> delete(String endpoint) async {
+    final token = await getToken();
+    return await http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _headers(token),
+    ).timeout(const Duration(seconds: 10));
+  }
+
+  Future<http.Response> patch(String endpoint, dynamic body) async {
     final token = await getToken();
     return await http.patch(
       Uri.parse('$baseUrl$endpoint'),
       headers: _headers(token),
       body: jsonEncode(body),
-    );
+    ).timeout(const Duration(seconds: 10));
+  }
+
+  Future<http.StreamedResponse> upload(String endpoint, String filePath) async {
+    final token = await getToken();
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$endpoint'));
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    return await request.send();
   }
 }

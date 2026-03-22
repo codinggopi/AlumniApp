@@ -29,6 +29,8 @@ class User(Base):
     graduation_year = Column(Integer, nullable=True)
     city = Column(String(120), nullable=True)
     bio = Column(Text, nullable=True)
+    profile_picture_url = Column(String(255), nullable=True)
+    current_status = Column(String(200), nullable=True)
     is_verified = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -49,6 +51,7 @@ class StudentProfile(Base):
     __tablename__ = "student_profiles"
 
     student_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    educational_details = Column(Text, nullable=True)
     skills = Column(Text, nullable=True)
     resume_url = Column(String(255), nullable=True)
     interests = Column(Text, nullable=True)
@@ -140,6 +143,11 @@ class Event(Base):
     location = Column(String(150), nullable=True)
     description = Column(Text, nullable=True)
     category = Column(String(50), default="event", nullable=False)
+    target_audience = Column(String(50), default="all", nullable=False)  # "all", "student", "alumni"
+    has_document = Column(Boolean, default=False, nullable=False)
+    has_photos = Column(Boolean, default=False, nullable=False)
+    document_url = Column(String(255), nullable=True)
+    photo_url = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     admin = relationship("User", foreign_keys=[created_by])

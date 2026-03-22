@@ -12,10 +12,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  String _selectedRole = 'student';
+  String? _selectedRole;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   void _handleRegister() async {
+    if (_selectedRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a role.')),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     final api = ApiService();
     
@@ -24,7 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'email': _emailController.text,
         'password': _passwordController.text,
         'full_name': _nameController.text,
-        'role': _selectedRole,
+        'role': _selectedRole!,
       });
 
       if (response.statusCode == 200 && mounted) {
@@ -94,12 +101,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const SizedBox(height: 15),
                       TextField(
                         controller: _passwordController,
-                        decoration: const InputDecoration(
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                          border: const OutlineInputBorder(),
                         ),
-                        obscureText: true,
                       ),
                       const SizedBox(height: 15),
                       DropdownButtonFormField<String>(
@@ -108,10 +119,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           labelText: 'Register As',
                           border: OutlineInputBorder(),
                         ),
+                        hint: const Text('Select Role'),
                         items: ['student', 'alumni']
                             .map((role) => DropdownMenuItem(value: role, child: Text(role.toUpperCase())))
                             .toList(),
-                        onChanged: (value) => setState(() => _selectedRole = value!),
+                        onChanged: (value) => setState(() => _selectedRole = value),
                       ),
                       const SizedBox(height: 30),
                       _isLoading

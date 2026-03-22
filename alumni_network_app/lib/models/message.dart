@@ -19,7 +19,7 @@ class Message {
       senderId: json['sender_id'],
       receiverId: json['receiver_id'],
       content: json['content'],
-      sentAt: DateTime.parse(json['sent_at']),
+      sentAt: DateTime.parse(json['sent_at']).toLocal(),
     );
   }
 }

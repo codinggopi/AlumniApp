@@ -1,8 +1,9 @@
 import os
 import shutil
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -107,6 +108,11 @@ class EventCreate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     category: str = "event"
+    target_audience: str = "all"  # "all", "student", "alumni"
+    has_document: bool = False
+    has_photos: bool = False
+    document_url: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class AnnouncementCreate(BaseModel):
@@ -170,6 +176,12 @@ class ProfileUpdateRequest(BaseModel):
     interests: Optional[str] = None
     resume_url: Optional[str] = None
     experience_summary: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    current_status: Optional[str] = None
+    educational_details: Optional[str] = None
+    skills: Optional[str] = None
+    interests: Optional[str] = None
+    resume_url: Optional[str] = None
 
 
 def payload_dict(payload: BaseModel):
@@ -259,6 +271,8 @@ def serialize_user(user: models.User):
         "graduation_year": user.graduation_year,
         "city": user.city,
         "bio": user.bio,
+        "profile_picture_url": user.profile_picture_url,
+        "current_status": user.current_status,
         "is_verified": user.is_verified,
     }
 
@@ -276,21 +290,22 @@ def serialize_alumni(user: models.User, profile: models.AlumniProfile):
     return data
 
 
+def serialize_student(user: models.User, profile: models.StudentProfile):
+    data = serialize_user(user)
+    data.update(
+        {
+            "skills": profile.educational_details,
+            "interests": profile.interests,
+            "resume_url": profile.resume_url,
+            "educational_details": profile.educational_details,
+        }
+    )
+    return data
+
+
 def ensure_connected(db: Session, sender_id: int, receiver_id: int):
-    connection = db.query(models.Connection).filter(
-        (
-            (models.Connection.requester_id == sender_id)
-            & (models.Connection.receiver_id == receiver_id)
-        )
-        | (
-            (models.Connection.requester_id == receiver_id)
-            & (models.Connection.receiver_id == sender_id)
-        ),
-        models.Connection.status == "accepted",
-    ).first()
-    if not connection:
-        raise HTTPException(status_code=400, detail="Users must be connected before messaging")
-    return connection
+    # Temporarily allowing everyone to message without formal connections for v2.0
+    return None
 
 
 @app.get("/")
@@ -353,7 +368,12 @@ def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)
         models.User.role == role,
     ).first()
 
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user:
+        print(f"Login failed: User '{payload.email}' with role '{role}' not found.")
+        raise HTTPException(status_code=401, detail="Invalid email, role, or password")
+
+    if not verify_password(payload.password, user.password_hash):
+        print(f"Login failed: Incorrect password for '{payload.email}'.")
         raise HTTPException(status_code=401, detail="Invalid email, role, or password")
 
     access_token = create_access_token(data={"sub": str(user.user_id), "role": user.role})
@@ -469,6 +489,23 @@ def list_alumni(
     return [serialize_alumni(user, profile) for user, profile in results]
 
 
+@app.get("/users", tags=["admin"])
+def list_users(
+    role: Optional[str] = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can list all users")
+    
+    query = db.query(models.User)
+    if role:
+        query = query.filter(models.User.role == role)
+    
+    users = query.all()
+    return [serialize_user(u) for u in users]
+
+
 @app.get("/profile/{user_id}", tags=["profile"])
 def get_profile(user_id: int, db: Session = Depends(get_db)):
     user = get_user_by_id(db, user_id)
@@ -481,6 +518,7 @@ def get_profile(user_id: int, db: Session = Depends(get_db)):
                 "skills": profile.skills if profile else None,
                 "interests": profile.interests if profile else None,
                 "resume_url": profile.resume_url if profile else None,
+                "educational_details": profile.educational_details if profile else None,
             }
         )
 
@@ -506,11 +544,10 @@ def read_users_me(current_user: models.User = Depends(get_current_user), db: Ses
 @app.patch("/profile/{user_id}", tags=["profile"])
 def update_profile(user_id: int, payload: ProfileUpdateRequest, db: Session = Depends(get_db)):
     user = get_user_by_id(db, user_id)
-    updates = payload_dict(payload)
+    updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
 
-    for field in ["full_name", "phone", "department", "graduation_year", "city", "bio"]:
-        value = updates.get(field)
-        if value is not None:
+    for field, value in updates.items():
+        if field in ["full_name", "phone", "department", "graduation_year", "city", "bio", "profile_picture_url"]:
             setattr(user, field, value)
 
     if user.role == "student":
@@ -518,7 +555,7 @@ def update_profile(user_id: int, payload: ProfileUpdateRequest, db: Session = De
         if not profile:
             profile = models.StudentProfile(student_id=user.user_id)
             db.add(profile)
-        for field in ["skills", "interests", "resume_url"]:
+        for field in ["skills", "interests", "resume_url", "educational_details"]:
             value = updates.get(field)
             if value is not None:
                 setattr(profile, field, value)
@@ -576,6 +613,17 @@ def upload_resume(user_id: int, file: UploadFile = File(...), db: Session = Depe
     db.commit()
 
     return {"status": "uploaded", "resume_url": resume_url}
+
+
+@app.post("/upload", tags=["common"])
+def upload_file(file: UploadFile = File(...)):
+    filename = f"common_{file.filename}".replace(" ", "_")
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    file_url = f"/uploads/{filename}"
+    return {"status": "uploaded", "url": file_url}
 
 
 @app.post("/internships", tags=["internships"])
@@ -698,42 +746,56 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/events", tags=["events"])
-def list_events(db: Session = Depends(get_db)):
-    return db.query(models.Event).order_by(models.Event.created_at.desc()).all()
+def list_events(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role == "admin":
+        return db.query(models.Event).order_by(models.Event.created_at.desc()).all()
+    
+    return db.query(models.Event).filter(
+        (models.Event.target_audience == "all") | (models.Event.target_audience == current_user.role)
+    ).order_by(models.Event.created_at.desc()).all()
 
 
 @app.patch("/events/{event_id}", tags=["events"])
-def update_event(event_id: int, payload: EventCreate, db: Session = Depends(get_db)):
+def update_event(event_id: int, payload: EventCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can update events")
+    
     event = db.query(models.Event).filter(models.Event.event_id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-
-    admin_user = get_user_by_id(db, payload.created_by)
-    if admin_user.role != "admin":
-        raise HTTPException(status_code=400, detail="Only admin users can update events")
 
     event.title = payload.title
     event.date = payload.date
     event.location = payload.location
     event.description = payload.description
     event.category = payload.category
+    event.target_audience = payload.target_audience
     db.commit()
     return {"status": "updated", "event_id": event.event_id}
 
 
 @app.delete("/events/{event_id}", tags=["events"])
-def delete_event(event_id: int, created_by: int, db: Session = Depends(get_db)):
+def delete_event(event_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete events")
+
     event = db.query(models.Event).filter(models.Event.event_id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    admin_user = get_user_by_id(db, created_by)
-    if admin_user.role != "admin":
-        raise HTTPException(status_code=400, detail="Only admin users can delete events")
-
     db.delete(event)
     db.commit()
     return {"status": "deleted"}
+
+
+@app.delete("/events", tags=["events"])
+def delete_all_events(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete all events")
+
+    db.query(models.Event).delete()
+    db.commit()
+    return {"status": "all deleted"}
 
 
 @app.post("/connections", tags=["alumni"])
@@ -850,10 +912,112 @@ def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
     return {"message_id": message.message_id, "sent_at": message.sent_at}
 
 
+@app.get("/conversations", tags=["messages"])
+def list_conversations(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Get all messages where user is either sender or receiver
+    sender_ids = [m.receiver_id for m in db.query(models.Message).filter(models.Message.sender_id == current_user.user_id).all()]
+    receiver_ids = [m.sender_id for m in db.query(models.Message).filter(models.Message.receiver_id == current_user.user_id).all()]
+    
+    unique_ids = list(set(sender_ids + receiver_ids))
+    other_users = db.query(models.User).filter(models.User.user_id.in_(unique_ids)).all()
+    
+    return [serialize_user(u) for u in other_users]
+
+
+@app.patch("/messages/{message_id}", tags=["messages"])
+def edit_message(message_id: int, content: str = Body(..., embed=True), current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    message = db.query(models.Message).filter(models.Message.message_id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if message.sender_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this message")
+
+    now = datetime.now(timezone.utc)
+    sent_at = message.sent_at.replace(tzinfo=timezone.utc) if message.sent_at.tzinfo is None else message.sent_at
+    
+    if now - sent_at > timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Edit period (5 mins) has expired")
+
+    message.content = content
+    db.commit()
+    return {"status": "updated", "content": content}
+
+
+@app.delete("/messages/clear", tags=["messages"])
+def clear_chat(other_user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Deletes all messages between current_user and another user
+    messages = db.query(models.Message).filter(
+        (
+            (models.Message.sender_id == current_user.user_id)
+            & (models.Message.receiver_id == other_user_id)
+        )
+        | (
+            (models.Message.sender_id == other_user_id)
+            & (models.Message.receiver_id == current_user.user_id)
+        )
+    ).all()
+    
+    count = 0
+    for msg in messages:
+        db.delete(msg)
+        count += 1
+        
+    db.commit()
+    return {"status": "cleared", "count": count}
+
+
+@app.delete("/messages/{message_id}", tags=["messages"])
+def delete_message(message_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    message = db.query(models.Message).filter(models.Message.message_id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if message.sender_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this message")
+
+    now = datetime.now(timezone.utc)
+    sent_at = message.sent_at.replace(tzinfo=timezone.utc) if message.sent_at.tzinfo is None else message.sent_at
+    
+    if now - sent_at > timedelta(hours=24):
+        raise HTTPException(status_code=400, detail="Deletion period (24 hours) has expired")
+
+    db.delete(message)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.post("/messages/bulk-delete", tags=["messages"])
+def bulk_delete_messages(message_ids: list[int], current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    
+    # Query only messages that belong to user and are < 24h old
+    messages = db.query(models.Message).filter(
+        models.Message.message_id.in_(message_ids),
+        models.Message.sender_id == current_user.user_id
+    ).all()
+    
+    deleted_count = 0
+    for msg in messages:
+        sent_at = msg.sent_at.replace(tzinfo=timezone.utc) if msg.sent_at.tzinfo is None else msg.sent_at
+        if now - sent_at <= timedelta(hours=24):
+            db.delete(msg)
+            deleted_count += 1
+            
+    db.commit()
+    return {"status": "deleted", "count": deleted_count}
+
+
+
 @app.get("/messages", tags=["messages"])
-def list_messages(user_id: int, other_user_id: int, db: Session = Depends(get_db)):
+def list_messages(user_id: int, other_user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     get_user_by_id(db, user_id)
     get_user_by_id(db, other_user_id)
+    
+    # Ensure current user is part of the chat or is admin
+    if current_user.user_id != user_id and current_user.user_id != other_user_id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to see these messages")
+
     ensure_connected(db, user_id, other_user_id)
 
     return db.query(models.Message).filter(
