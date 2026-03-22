@@ -15,11 +15,16 @@ class _PostInternshipScreenState extends State<PostInternshipScreen> {
   final _companyController = TextEditingController();
   final _descController = TextEditingController();
   final _locationController = TextEditingController();
-  final _stipendController = TextEditingController();
+  final _durationController = TextEditingController();
   bool _isLoading = false;
 
   void _submit() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (_roleController.text.isEmpty || _companyController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in required fields')));
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
@@ -29,7 +34,7 @@ class _PostInternshipScreenState extends State<PostInternshipScreen> {
         'company': _companyController.text,
         'description': _descController.text,
         'location': _locationController.text,
-        'stipend': _stipendController.text,
+        'duration': _durationController.text,
       });
 
       if (response.statusCode == 200 && mounted) {
@@ -51,15 +56,19 @@ class _PostInternshipScreenState extends State<PostInternshipScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              TextField(controller: _roleController, decoration: const InputDecoration(labelText: 'Role Title')),
-              TextField(controller: _companyController, decoration: const InputDecoration(labelText: 'Company Name')),
+              TextField(controller: _roleController, decoration: const InputDecoration(labelText: 'Role Title *')),
+              TextField(controller: _companyController, decoration: const InputDecoration(labelText: 'Company Name *')),
               TextField(controller: _locationController, decoration: const InputDecoration(labelText: 'Location')),
-              TextField(controller: _stipendController, decoration: const InputDecoration(labelText: 'Stipend')),
+              TextField(controller: _durationController, decoration: const InputDecoration(labelText: 'Time Period (e.g. 3 Months, 6 Months)')),
               TextField(controller: _descController, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
               const SizedBox(height: 20),
               _isLoading
                   ? const CircularProgressIndicator()
-                  : ElevatedButton(onPressed: _submit, child: const Text('Post Listing')),
+                  : ElevatedButton(
+                      onPressed: _submit,
+                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                      child: const Text('Post Listing'),
+                    ),
             ],
           ),
         ),

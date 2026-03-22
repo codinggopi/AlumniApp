@@ -16,6 +16,8 @@ import 'screens/auth/register_screen.dart';
 import 'screens/admin/user_list_screen.dart';
 import 'screens/admin/post_event_screen.dart';
 import 'screens/directory/alumni_directory.dart';
+import 'screens/connections/connection_requests_screen.dart';
+import 'screens/auth/splash_screen.dart' as animated;
 
 void main() {
   runApp(
@@ -52,65 +54,31 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _showSplash = true;
+  bool _animationFinished = false;
 
   @override
   void initState() {
     super.initState();
-    _checkInitialAuth();
-  }
-
-  Future<void> _checkInitialAuth() async {
-    await Provider.of<AuthProvider>(context, listen: false).checkAuth();
-    if (mounted) {
-      setState(() => _showSplash = false);
-    }
+    // Run auth check and animation in parallel
+    Provider.of<AuthProvider>(context, listen: false).checkAuth();
+    
+    // Minimum splash duration to show animation
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _animationFinished = true);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_showSplash) return const SplashScreen();
+    if (!_animationFinished) return const animated.SplashScreen();
 
     final auth = Provider.of<AuthProvider>(context);
-    if (auth.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
     if (auth.isAuthenticated) return const HomeScreen();
     return const LoginScreen();
   }
 }
 
-class SplashScreen extends StatelessWidget {
-  const SplashScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [Colors.blue, Colors.indigo]),
-        ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.school, size: 80, color: Colors.white),
-            SizedBox(height: 20),
-            Text(
-              'ALUMNI APP',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -459,6 +427,7 @@ class _DashboardViewState extends State<DashboardView> {
                     action.title,
                     action.color,
                     action.onTap,
+                    index,
                   );
                 },
               ),
@@ -566,6 +535,19 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
       );
+    } else if (role == 'alumni') {
+      actions.add(
+        QuickAction(
+          id: 'connection_requests',
+          icon: Icons.person_add_alt_1,
+          title: 'Connection Requests',
+          color: Colors.deepPurple,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ConnectionRequestsScreen()),
+          ),
+        ),
+      );
     }
     return actions;
   }
@@ -576,24 +558,100 @@ class _DashboardViewState extends State<DashboardView> {
     String title,
     Color color,
     VoidCallback onTap,
+    int index,
   ) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: InkWell(
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 30 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: _AnimatedActionCard(
+        icon: icon,
+        title: title,
+        color: color,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class _AnimatedActionCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AnimatedActionCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_AnimatedActionCard> createState() => _AnimatedActionCardState();
+}
+
+class _AnimatedActionCardState extends State<_AnimatedActionCard> {
+  double _scale = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _scale = 0.92),
+      onTapUp: (_) => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 1.0),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 100),
+        child: Card(
+          elevation: 4,
+          shadowColor: widget.color.withOpacity(0.3),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  widget.color.withOpacity(0.05),
+                ],
+              ),
             ),
-          ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: widget.color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(widget.icon, size: 32, color: widget.color),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.grey[800],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

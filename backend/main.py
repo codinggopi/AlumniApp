@@ -705,6 +705,10 @@ def update_internship(internship_id: int, payload: InternshipCreate, db: Session
 @app.delete("/internships/{internship_id}", tags=["internships"])
 def delete_internship(internship_id: int, db: Session = Depends(get_db)):
     internship = get_internship_by_id(db, internship_id)
+    # Delete related applications first to avoid foreign key constraint errors
+    db.query(models.Application).filter(
+        models.Application.internship_id == internship_id
+    ).delete(synchronize_session=False)
     db.delete(internship)
     db.commit()
     return {"status": "deleted"}
@@ -1060,5 +1064,133 @@ def mark_notification_as_read(noti_id: int, db: Session = Depends(get_db)):
 def delete_notification(noti_id: int, db: Session = Depends(get_db)):
     notification = get_notification_by_id(db, noti_id)
     db.delete(notification)
+    db.commit()
+    return {"status": "deleted"}
+
+
+# ─── Connection Endpoints ────────────────────────────────────────────────────
+
+@app.post("/connections", tags=["connections"])
+def send_connection_request(
+    payload: ConnectionCreate,
+    db: Session = Depends(get_db),
+):
+    """Student sends a connection request to an alumni."""
+    requester = get_user_by_id(db, payload.requester_id)
+    receiver = get_user_by_id(db, payload.receiver_id)
+
+    if requester.role != "student":
+        raise HTTPException(status_code=400, detail="Only students can send connection requests")
+    if receiver.role != "alumni":
+        raise HTTPException(status_code=400, detail="Connection requests can only be sent to alumni")
+
+    # Check if a request already exists
+    existing = db.query(models.Connection).filter(
+        models.Connection.requester_id == payload.requester_id,
+        models.Connection.receiver_id == payload.receiver_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Connection request already {existing.status}")
+
+    conn = models.Connection(
+        requester_id=payload.requester_id,
+        receiver_id=payload.receiver_id,
+        status="pending",
+    )
+    db.add(conn)
+    db.commit()
+    db.refresh(conn)
+    return {"connection_id": conn.connection_id, "status": conn.status, "message": "Connection request sent"}
+
+
+@app.get("/connections", tags=["connections"])
+def list_connections(
+    user_id: int,
+    role: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    For alumni  (role=alumni): returns pending incoming requests.
+    For student (role=student): returns all outgoing requests with their status.
+    """
+    get_user_by_id(db, user_id)
+    if role == "alumni":
+        results = (
+            db.query(models.Connection, models.User)
+            .join(models.User, models.User.user_id == models.Connection.requester_id)
+            .filter(
+                models.Connection.receiver_id == user_id,
+                models.Connection.status == "pending",
+            )
+            .all()
+        )
+        return [
+            {
+                "connection_id": conn.connection_id,
+                "status": conn.status,
+                "created_at": conn.created_at.isoformat(),
+                "requester": {
+                    "user_id": u.user_id,
+                    "full_name": u.full_name,
+                    "email": u.email,
+                    "department": u.department,
+                    "graduation_year": u.graduation_year,
+                },
+            }
+            for conn, u in results
+        ]
+    else:
+        # student – return outgoing requests
+        results = (
+            db.query(models.Connection, models.User)
+            .join(models.User, models.User.user_id == models.Connection.receiver_id)
+            .filter(models.Connection.requester_id == user_id)
+            .all()
+        )
+        return [
+            {
+                "connection_id": conn.connection_id,
+                "status": conn.status,
+                "created_at": conn.created_at.isoformat(),
+                "receiver": {
+                    "user_id": u.user_id,
+                    "full_name": u.full_name,
+                },
+            }
+            for conn, u in results
+        ]
+
+
+@app.patch("/connections/{connection_id}", tags=["connections"])
+def update_connection_status(
+    connection_id: int,
+    payload: ConnectionStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    """Alumni accepts or rejects a pending connection request."""
+    conn = db.query(models.Connection).filter(
+        models.Connection.connection_id == connection_id
+    ).first()
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    allowed = {"accepted", "rejected"}
+    if payload.status not in allowed:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {allowed}")
+
+    conn.status = payload.status
+    db.commit()
+    return {"connection_id": conn.connection_id, "status": conn.status}
+
+
+@app.delete("/connections/{connection_id}", tags=["connections"])
+def delete_connection(connection_id: int, db: Session = Depends(get_db)):
+    """Cancel / withdraw a connection request (by the student who sent it)."""
+    conn = db.query(models.Connection).filter(
+        models.Connection.connection_id == connection_id
+    ).first()
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    db.delete(conn)
     db.commit()
     return {"status": "deleted"}

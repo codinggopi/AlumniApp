@@ -67,8 +67,13 @@ class InternshipDetailScreen extends StatelessWidget {
             Text('Description:', style: Theme.of(context).textTheme.titleMedium),
             Text(internship.description ?? 'No description provided.'),
             const SizedBox(height: 10),
-            Text('Stipend: ${internship.stipend ?? "Unpaid"}'),
-            Text('Duration: ${internship.duration ?? "N/A"}'),
+            Row(
+              children: [
+                const Icon(Icons.access_time, size: 20, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text('Duration: ${internship.duration ?? "N/A"}', style: const TextStyle(fontSize: 16)),
+              ],
+            ),
             const Spacer(),
             if (user?.role == 'student')
               SizedBox(

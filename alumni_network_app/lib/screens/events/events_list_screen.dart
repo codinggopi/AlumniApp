@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:convert';
 import '../../services/api_service.dart';
 import '../../models/event.dart';
@@ -24,6 +25,7 @@ class _EventsListScreenState extends State<EventsListScreen> {
   void initState() {
     super.initState();
     _fetchEvents();
+    // no single-event delete; use bulk-delete flow and explicit refresh
   }
 
   Future<void> _fetchEvents() async {
@@ -32,8 +34,13 @@ class _EventsListScreenState extends State<EventsListScreen> {
       final response = await _apiService.get('/events');
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        final fetched = data.map((json) => Event.fromJson(json)).toList();
+        // debug log fetched ids to help diagnose stale data for admins
+        debugPrint(
+          '[EventsListScreen] fetched ${fetched.length} events: ${fetched.map((e) => e.eventId).toList()}',
+        );
         setState(() {
-          _events = data.map((json) => Event.fromJson(json)).toList();
+          _events = fetched;
         });
       }
     } catch (e) {
@@ -48,16 +55,24 @@ class _EventsListScreenState extends State<EventsListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete ALL Events'),
-        content: const Text('Are you sure you want to delete EVERY event and news item? This cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete EVERY event and news item? This cannot be undone.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _deleteAllEvents();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('DELETE ALL', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'DELETE ALL',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -69,20 +84,25 @@ class _EventsListScreenState extends State<EventsListScreen> {
     final response = await _apiService.delete('/events');
     if (response.statusCode == 200) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All events cleared')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All events cleared')));
         _fetchEvents();
       }
     } else {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to clear events')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to clear events')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = Provider.of<AuthProvider>(context, listen: false).user?.role == 'admin';
+    final isAdmin =
+        Provider.of<AuthProvider>(context, listen: false).user?.role == 'admin';
 
     return Scaffold(
       appBar: AppBar(
@@ -99,55 +119,88 @@ class _EventsListScreenState extends State<EventsListScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _events.isEmpty
-              ? EmptyStateWidget(
-                  icon: Icons.event_busy,
-                  title: 'No Events Yet',
-                  message: 'Stay tuned! We will notify you when new events and news are posted.',
-                  onRetry: _fetchEvents,
-                )
-              : ListView.builder(
-                  itemCount: _events.length,
-                  itemBuilder: (context, index) {
-                    final event = _events[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      child: ListTile(
-                        leading: Icon(
-                          event.category == 'event' ? Icons.event : Icons.announcement,
-                          color: event.category == 'event' ? Colors.blue : Colors.orange,
+          ? EmptyStateWidget(
+              icon: Icons.event_busy,
+              title: 'No Events Yet',
+              message:
+                  'Stay tuned! We will notify you when new events and news are posted.',
+              onRetry: _fetchEvents,
+            )
+          : ListView.builder(
+              itemCount: _events.length,
+              itemBuilder: (context, index) {
+                final event = _events[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      event.category == 'event'
+                          ? Icons.event
+                          : Icons.announcement,
+                      color: event.category == 'event'
+                          ? Colors.blue
+                          : Colors.orange,
+                    ),
+                    title: Text(
+                      event.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${event.date ?? "No Date"} | ${event.location ?? "Online"}',
                         ),
-                        title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${event.date ?? "No Date"} | ${event.location ?? "Online"}'),
-                            if (event.description != null && event.description!.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4.0),
-                                child: Text(event.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
-                              ),
-                          ],
+                        if (event.description != null &&
+                            event.description!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              event.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (event.hasDocument)
+                          Icon(
+                            Icons.attachment,
+                            size: 20,
+                            color: Colors.grey[600],
+                          ),
+                        if (event.hasPhotos)
+                          Icon(
+                            Icons.insert_photo,
+                            size: 20,
+                            color: Colors.grey[600],
+                          ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                    isThreeLine: true,
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EventDetailScreen(event: event),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (event.hasDocument) Icon(Icons.attachment, size: 20, color: Colors.grey[600]),
-                            if (event.hasPhotos) Icon(Icons.insert_photo, size: 20, color: Colors.grey[600]),
-                            const Icon(Icons.chevron_right),
-                          ],
-                        ),
-                        isThreeLine: true,
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => EventDetailScreen(event: event)),
-                          );
-                          if (result == true) _fetchEvents();
-                        },
-                      ),
-                    );
-                  },
-                ),
+                      );
+                      // Only refresh when detail screen signals an update (legacy boolean true)
+                      if (result == true) {
+                        _fetchEvents();
+                      }
+                    },
+                  ),
+                );
+              },
+            ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
               onPressed: () async {
@@ -163,4 +216,6 @@ class _EventsListScreenState extends State<EventsListScreen> {
           : null,
     );
   }
+
+  // no cleanup needed for event-bus subscription (not used)
 }
