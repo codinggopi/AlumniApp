@@ -1,4 +1,4 @@
-name: Build Flutter APK and send to Telegram
+name: Build Flutter AAB and APK, Publish Release, and Send to Telegram 
 
 on:
   push:
@@ -8,75 +8,59 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/cirruslabs/flutter:stable
+      options: --privileged
+
     steps:
-      - name: Checkout repository
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Set up Java (required for Android SDK)
-        uses: actions/setup-java@v4
-        with:
-          java-version: '11'
-
-      - name: Install dependencies for Android SDK tooling
+      - name: Install Android SDK components
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends unzip curl libglu1-mesa
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 'stable'
-
-      - name: Install Android command-line tools
-        run: |
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-          cd $ANDROID_SDK_ROOT/cmdline-tools
-          curl -sSLo commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools.zip
-          # Move to 'latest' folder to match expected path structure
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
-          mv cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/ || true
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          # Install required SDK components and accept licenses
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-33" "build-tools;33.0.0"
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses
-        shell: bash
-
-      - name: Flutter pub get
+          sudo apt-get install -y unzip
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          curl -o sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip sdk.zip -d "$ANDROID_HOME/cmdline-tools/temp"
+          mv "$ANDROID_HOME/cmdline-tools/temp/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest/"
+          rm -rf "$ANDROID_HOME/cmdline-tools/temp"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        
+      - name: Install dependencies
         working-directory: alumni_network_app
         run: flutter pub get
 
-      - name: Build APK (release)
+      - name: Clean project
         working-directory: alumni_network_app
-        run: flutter build apk --release --no-shrink
+        run: flutter clean
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: alumni_network_app/build/app/outputs/flutter-apk/app-release.apk
+      - name: Analyze project
+        working-directory: alumni_network_app
+        run: |
+          flutter analyze > analysis.log || true
+          cat analysis.log
+          if grep -q "error •" analysis.log; then
+            echo "❌ Flutter analysis failed"
+            exit 1
+          else
+            echo "✅ Flutter analysis passed"
+          fi
+
+      - name: Build APK (Split‑per‑ABI)
+        working-directory: alumni_network_app
+        run: flutter build apk --release --split-per-abi
 
       - name: Send APK to Telegram
         if: success()
+        working-directory: alumni_network_app
         env:
-          TELEGRAM_BOT_TOKEN: 8640322510:AAHOBHKgddKGU1kyRXDVbq2zxu4Zir7dFoI
-          TELEGRAM_CHAT_ID: 8000518889
-          APK_PATH: alumni_network_app/build/app/outputs/flutter-apk/app-release.apk
+          BOT_TOKEN: 8640322510:AAHOBHKgddKGU1kyRXDVbq2zxu4Zir7dFoI
+          CHAT_ID: 8000518889
         run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "Telegram secrets not set. Skipping send step.";
-            exit 0;
-          fi
-
-          if [ ! -f "$APK_PATH" ]; then
-            echo "APK not found at $APK_PATH";
-            exit 1;
-          fi
-
-          echo "Sending APK to Telegram chat id $TELEGRAM_CHAT_ID..."
-          # Telegram API: sendDocument. This will upload the file directly from the runner to Telegram.
-          RESPONSE=$(curl -s -F chat_id="$TELEGRAM_CHAT_ID" -F document=@"$APK_PATH" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument")
-          echo "Telegram response: $RESPONSE"
-          # Basic success check
-          echo "$RESPONSE" | grep -q '"ok":true' || (echo "Telegram API reported failure" && exit 1)
-        shell: bash
+          curl -F document=@build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+               -F chat_id="$CHAT_ID" \
+               -F caption="📱 APK Build (arm64-v8a) — ${{ github.actor }} on branch `${{ github.ref_name }}`" \
+               "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
