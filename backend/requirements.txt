@@ -3,6 +3,7 @@ uvicorn
 sqlalchemy
 mysql-connector-python
 python-multipart
+asgiref
 passlib[bcrypt]
 python-jose[cryptography]
 
