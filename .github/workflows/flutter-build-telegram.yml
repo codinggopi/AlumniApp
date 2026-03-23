@@ -6,10 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-send:
+  build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
