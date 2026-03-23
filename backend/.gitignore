@@ -14,5 +14,4 @@ ENV/
 # Environment files
 .env
 
-# Application specific
-uploads/
+
