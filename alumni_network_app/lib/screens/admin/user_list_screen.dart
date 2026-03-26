@@ -61,6 +61,10 @@ class _UserListScreenState extends State<UserListScreen> {
           );
         }
         _fetchUsers();
+      } else {
+        throw Exception(
+          'Server returned ${response.statusCode}: ${response.body}',
+        );
       }
     } catch (e) {
       debugPrint('Delete user error: $e');

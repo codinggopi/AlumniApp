@@ -584,11 +584,61 @@ def delete_profile(user_id: int, current_user: models.User = Depends(get_current
         raise HTTPException(status_code=403, detail="Not authorized to delete this profile")
     
     user = get_user_by_id(db, user_id)
-    # Delete profiles first due to FK constraints if not using CASCADE
-    db.query(models.StudentProfile).filter(models.StudentProfile.student_id == user_id).delete()
-    db.query(models.AlumniProfile).filter(models.AlumniProfile.alumni_id == user_id).delete()
-    db.delete(user)
-    db.commit()
+    try:
+        # Remove dependent records first because most foreign keys do not use CASCADE.
+        db.query(models.Connection).filter(
+            (models.Connection.requester_id == user_id)
+            | (models.Connection.receiver_id == user_id)
+        ).delete(synchronize_session=False)
+
+        db.query(models.Message).filter(
+            (models.Message.sender_id == user_id)
+            | (models.Message.receiver_id == user_id)
+        ).delete(synchronize_session=False)
+
+        db.query(models.Notification).filter(
+            models.Notification.user_id == user_id
+        ).delete(synchronize_session=False)
+
+        db.query(models.Application).filter(
+            models.Application.student_id == user_id
+        ).delete(synchronize_session=False)
+
+        internship_ids = [
+            internship_id
+            for (internship_id,) in db.query(models.Internship.internship_id)
+            .filter(models.Internship.posted_by == user_id)
+            .all()
+        ]
+        if internship_ids:
+            db.query(models.Application).filter(
+                models.Application.internship_id.in_(internship_ids)
+            ).delete(synchronize_session=False)
+            db.query(models.Internship).filter(
+                models.Internship.internship_id.in_(internship_ids)
+            ).delete(synchronize_session=False)
+
+        db.query(models.Event).filter(
+            models.Event.created_by == user_id
+        ).delete(synchronize_session=False)
+
+        db.query(models.Announcement).filter(
+            models.Announcement.created_by == user_id
+        ).delete(synchronize_session=False)
+
+        db.query(models.StudentProfile).filter(
+            models.StudentProfile.student_id == user_id
+        ).delete(synchronize_session=False)
+        db.query(models.AlumniProfile).filter(
+            models.AlumniProfile.alumni_id == user_id
+        ).delete(synchronize_session=False)
+
+        db.delete(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     return {"status": "deleted"}
 
 
