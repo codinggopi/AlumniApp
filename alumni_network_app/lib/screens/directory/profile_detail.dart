@@ -21,6 +21,13 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   int? _connectionId;
   bool _connectLoading = false;
 
+  bool get _isStudentAlumniPair {
+    final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
+    if (currentUser == null) return false;
+    return (currentUser.role == 'student' && widget.user.role == 'alumni') ||
+        (currentUser.role == 'alumni' && widget.user.role == 'student');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -29,16 +36,26 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
 
   Future<void> _checkConnectionStatus() async {
     final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
-    if (currentUser == null || currentUser.role != 'student') return;
+    if (currentUser == null || !_isStudentAlumniPair) return;
 
     try {
-      final response = await _api.get('/connections?user_id=${currentUser.userId}&role=student');
+      final roleQuery = currentUser.role == 'student'
+          ? 'student'
+          : 'alumni&status=accepted';
+      final response =
+          await _api.get('/connections?user_id=${currentUser.userId}&role=$roleQuery');
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        final match = data.firstWhere(
-          (c) => c['receiver']['user_id'] == widget.user.userId,
-          orElse: () => null,
-        );
+        dynamic match;
+        for (final connection in data) {
+          final peer = currentUser.role == 'student'
+              ? connection['receiver']
+              : connection['requester'];
+          if (peer != null && peer['user_id'] == widget.user.userId) {
+            match = connection;
+            break;
+          }
+        }
         if (match != null && mounted) {
           setState(() {
             _connectionId = match['connection_id'];
@@ -251,50 +268,9 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               if (currentUser.role == 'student' && widget.user.role == 'alumni') ...[
                 _buildConnectButton(),
                 const SizedBox(height: 15),
-                // Message button gated behind accepted connection for student → alumni
-                if (_connectionStatus == 'accepted')
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ChatRoomScreen(otherUser: widget.user)),
-                        );
-                      },
-                      icon: const Icon(Icons.message, color: Colors.white),
-                      label: const Text('MESSAGE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.lock_outline, color: Colors.grey[400], size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          _connectionStatus == 'pending'
-                              ? 'Messaging unlocks once alumni accepts your request'
-                              : 'Connect with this alumni to start messaging',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
+                _buildMessageAccessWidget(),
+              ] else if (currentUser.role == 'alumni' && widget.user.role == 'student') ...[
+                _buildMessageAccessWidget(),
               ] else ...[
                 // For non-student→alumni combos (alumni→student, etc.) show Message freely
                 SizedBox(
@@ -345,6 +321,63 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMessageAccessWidget() {
+    if (_connectionStatus == 'accepted') {
+      return SizedBox(
+        width: double.infinity,
+        height: 55,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => ChatRoomScreen(otherUser: widget.user)),
+            );
+          },
+          icon: const Icon(Icons.message, color: Colors.white),
+          label: const Text('MESSAGE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          ),
+        ),
+      );
+    }
+
+    final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
+    final isStudent = currentUser?.role == 'student';
+    final lockText = _connectionStatus == 'pending'
+        ? (isStudent
+            ? 'Messaging unlocks once alumni accepts your request'
+            : 'Messaging unlocks after you accept this student request')
+        : (isStudent
+            ? 'Connect with this alumni to start messaging'
+            : 'Accept this student connection request to start messaging');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lock_outline, color: Colors.grey[400], size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              lockText,
+              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -20,6 +20,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _messageController = TextEditingController();
   List<Message> _messages = [];
   bool _isLoading = true;
+  bool _isMessagingLocked = false;
+  String? _lockReason;
   int? _editingMessageId;
   final Set<int> _selectedMessages = {};
 
@@ -40,15 +42,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         setState(() {
           _messages = data.map((json) => Message.fromJson(json)).toList();
           _isLoading = false;
+          _isMessagingLocked = false;
+          _lockReason = null;
         });
+      } else if (response.statusCode == 403) {
+        final detail = jsonDecode(response.body)['detail'] as String?;
+        setState(() {
+          _messages = [];
+          _isLoading = false;
+          _isMessagingLocked = true;
+          _lockReason = detail ?? 'Messaging is locked for this chat';
+        });
+      } else {
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint('Fetch messages error: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _sendMessage() async {
-    if (_messageController.text.isEmpty) return;
+    if (_messageController.text.isEmpty || _isMessagingLocked) return;
     
     final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
     final content = _messageController.text;
@@ -69,6 +84,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       if (response.statusCode == 200) {
         _fetchMessages();
+      } else if (response.statusCode == 403) {
+        final detail = jsonDecode(response.body)['detail'] as String?;
+        if (mounted) {
+          setState(() {
+            _isMessagingLocked = true;
+            _lockReason = detail ?? 'Messaging is locked for this chat';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_lockReason!)),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Send message error: $e');
@@ -174,15 +200,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   bool _canEdit(Message msg) {
-    final sentLocal = msg.sentAt.toLocal();
-    final now = DateTime.now();
-    return now.difference(sentLocal).inMinutes < 5;
+    final nowUtc = DateTime.now().toUtc();
+    return nowUtc.difference(msg.sentAt).inMinutes < 5;
   }
 
   bool _canDelete(Message msg) {
-    final sentLocal = msg.sentAt.toLocal();
-    final now = DateTime.now();
-    return now.difference(sentLocal).inHours < 24;
+    final nowUtc = DateTime.now().toUtc();
+    return nowUtc.difference(msg.sentAt).inHours < 24;
   }
 
   void _toggleSelection(int msgId) {
@@ -193,6 +217,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _selectedMessages.add(msgId);
       }
     });
+  }
+
+  String _formatIstTime(DateTime utcTime) {
+    final istTime = utcTime.add(const Duration(hours: 5, minutes: 30));
+    final hour = istTime.hour.toString().padLeft(2, '0');
+    final minute = istTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute IST';
   }
 
   @override
@@ -358,7 +389,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      "${actualMsg.sentAt.hour.toString().padLeft(2, '0')}:${actualMsg.sentAt.minute.toString().padLeft(2, '0')} IST",
+                                      _formatIstTime(actualMsg.sentAt),
                                       style: TextStyle(color: (isSelected || !isMe) ? Colors.black45 : Colors.white70, fontSize: 10),
                                     ),
                                   ],
@@ -405,30 +436,52 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 color: Colors.white,
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))],
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: _isMessagingLocked
+                  ? Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[300]!),
                       ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lock_outline, color: Colors.grey[600], size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _lockReason ?? 'Messaging is locked for this chat',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: InputDecoration(
+                              hintText: 'Type a message...',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          child: IconButton(
+                            icon: Icon(_editingMessageId != null ? Icons.check : Icons.send, color: Colors.white),
+                            onPressed: _sendMessage,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: Colors.blue,
-                    child: IconButton(
-                      icon: Icon(_editingMessageId != null ? Icons.check : Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
-                    ),
-                  ),
-                ],
-              ),
             ),
         ],
       ),

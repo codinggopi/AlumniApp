@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/empty_state.dart';
 import 'chat_room_screen.dart';
-import '../admin/user_list_screen.dart';
+import 'connected_users_screen.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
@@ -42,6 +44,11 @@ class _InboxScreenState extends State<InboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = Provider.of<AuthProvider>(context).user;
+    final peerLabel = currentUser?.role == 'alumni'
+        ? 'Connected Students & Admins'
+        : 'Connected Alumni';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Messages', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -52,7 +59,9 @@ class _InboxScreenState extends State<InboxScreen> {
               ? EmptyStateWidget(
                   icon: Icons.chat_bubble_outline,
                   title: 'No Conversations',
-                  message: 'Start a new conversation to connect with others!',
+                  message: currentUser?.role == 'alumni'
+                      ? 'Start a chat with your connected students or with admin.'
+                      : 'Start a new conversation to connect with others!',
                   onRetry: _fetchConversations,
                 )
               : ListView.separated(
@@ -85,38 +94,13 @@ class _InboxScreenState extends State<InboxScreen> {
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Show a simple dialog to pick role or just go to a list
-          showModalBottomSheet(
-            context: context,
-            builder: (context) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('Start Conversation With', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.school, color: Colors.indigo),
-                  title: const Text('Students'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UserListScreen(role: 'student', title: 'Start Chat with Student')));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.group_work, color: Colors.teal),
-                  title: const Text('Alumni'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UserListScreen(role: 'alumni', title: 'Start Chat with Alumni')));
-                  },
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
-          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ConnectedUsersScreen()),
+          ).then((_) => _fetchConversations());
         },
         backgroundColor: Colors.blue,
+        tooltip: peerLabel,
         child: const Icon(Icons.add_comment, color: Colors.white),
       ),
     );

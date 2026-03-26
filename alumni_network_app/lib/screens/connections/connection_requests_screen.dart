@@ -62,10 +62,13 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
     try {
       final response = await _api.patch('/connections/$connectionId', {'status': status});
       if (response.statusCode == 200 && mounted) {
-        final label = status == 'accepted' ? 'Accepted' : 'Rejected';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Connection $label'),
+            content: Text(
+              status == 'accepted'
+                  ? 'Connection request responded: accepted'
+                  : 'Connection request responded: rejected',
+            ),
             backgroundColor: status == 'accepted' ? Colors.green : Colors.red,
           ),
         );
