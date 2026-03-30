@@ -5,9 +5,12 @@ import 'dart:async';
 class EventBus {
   static final StreamController<int> _deletedController =
       StreamController<int>.broadcast();
+  static final StreamController<void> _refreshController =
+      StreamController<void>.broadcast();
 
   /// Stream of deleted event ids
   static Stream<int> get deletedStream => _deletedController.stream;
+  static Stream<void> get refreshStream => _refreshController.stream;
 
   /// Emit a deleted event id
   static void emitDeleted(int eventId) {
@@ -19,8 +22,16 @@ class EventBus {
     } catch (_) {}
   }
 
+  static void emitRefresh() {
+    try {
+      print('[EventBus] emitRefresh');
+      _refreshController.add(null);
+    } catch (_) {}
+  }
+
   /// Dispose the internal controllers (only useful on app teardown)
   static Future<void> dispose() async {
     await _deletedController.close();
+    await _refreshController.close();
   }
 }

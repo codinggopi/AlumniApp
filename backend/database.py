@@ -3,7 +3,13 @@ import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./alumni_app.db")
+# Supabase PostgreSQL connection string
+# Replace the URL below with your Supabase connection string from:
+# Supabase Dashboard → Settings → Database → Connection string → URI
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxx.supabase.co:5432/postgres"
+)
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 

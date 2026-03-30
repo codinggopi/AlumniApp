@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../../services/api_service.dart';
+import '../../services/event_bus.dart';
 import '../../models/event.dart';
 import '../../widgets/empty_state.dart';
 import '../../providers/auth_provider.dart';
@@ -20,12 +21,15 @@ class _EventsListScreenState extends State<EventsListScreen> {
   final ApiService _apiService = ApiService();
   List<Event> _events = [];
   bool _isLoading = true;
+  StreamSubscription<void>? _refreshSub;
 
   @override
   void initState() {
     super.initState();
     _fetchEvents();
-    // no single-event delete; use bulk-delete flow and explicit refresh
+    _refreshSub = EventBus.refreshStream.listen((_) {
+      if (mounted) _fetchEvents();
+    });
   }
 
   Future<void> _fetchEvents() async {
@@ -217,5 +221,9 @@ class _EventsListScreenState extends State<EventsListScreen> {
     );
   }
 
-  // no cleanup needed for event-bus subscription (not used)
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
+  }
 }

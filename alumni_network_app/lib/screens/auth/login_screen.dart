@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: Colors.white),
+            CircularProgressIndicator(color: Color.fromARGB(255, 7, 178, 225)),
             SizedBox(height: 20),
             Text('Logging in...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
           ],

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
+import '../../services/event_bus.dart';
 import '../../providers/auth_provider.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -108,6 +109,7 @@ class _PostEventScreenState extends State<PostEventScreen> {
       });
 
       if (response.statusCode == 200 && mounted) {
+        EventBus.emitRefresh();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event posted successfully!')));
         Navigator.pop(context, true);
       } else {

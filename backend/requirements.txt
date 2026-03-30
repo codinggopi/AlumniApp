@@ -9,4 +9,6 @@ python-jose[cryptography]
 
 # Optional but recommended for production
 email-validator
-python-dotenv
+
+# PostgreSQL driver (for Render hosted DB)
+psycopg2-binary
