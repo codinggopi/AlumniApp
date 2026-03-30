@@ -8,7 +8,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Supabase Dashboard → Settings → Database → Connection string → URI
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:[Gopinath@4216]@db.aarxiswaklqxodiwzltc.supabase.co:5432/postgres"
+    "postgresql://postgres:[gopinathapp12344]@db.oxynqlrgwntkfoawxraj.supabase.co:5432/postgres"
 )
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
