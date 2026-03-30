@@ -1243,3 +1243,6 @@ def delete_notification(noti_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+@app.on_event("startup")
+def startup():
+    init_db()
