@@ -52,6 +52,8 @@ class _InboxScreenState extends State<InboxScreen> {
     final currentUser = Provider.of<AuthProvider>(context).user;
     final peerLabel = currentUser?.role == 'alumni'
         ? 'Connected Students & Admins'
+        : currentUser?.role == 'admin'
+        ? 'Students & Alumni'
         : 'Connected Alumni';
 
     return Scaffold(
@@ -69,6 +71,8 @@ class _InboxScreenState extends State<InboxScreen> {
               title: 'No Conversations',
               message: currentUser?.role == 'alumni'
                   ? 'Start a chat with your connected students or with admin.'
+                  : currentUser?.role == 'admin'
+                  ? 'Use + to start a direct chat with any student or alumni.'
                   : 'Start a new conversation to connect with others!',
               onRetry: _fetchConversations,
             )

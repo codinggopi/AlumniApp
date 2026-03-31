@@ -20,6 +20,7 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
   List<User> _users = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  final Set<int> _selectedUserIds = <int>{};
 
   List<User> get _filtered => _searchQuery.isEmpty
       ? _users
@@ -98,6 +99,46 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
     }
   }
 
+  Future<void> _bulkDeleteUsers() async {
+    final ids = _selectedUserIds.toList();
+    if (ids.isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      for (final userId in ids) {
+        final response = await _apiService.delete('/profile/$userId');
+        if (response.statusCode != 200) {
+          throw Exception(
+            'Server returned ${response.statusCode}: ${response.body}',
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${ids.length} users deleted successfully'),
+          ),
+        );
+      }
+
+      _selectedUserIds.clear();
+      await _fetchUsers();
+    } catch (e) {
+      debugPrint('Bulk delete users error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting selected users: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _confirmDelete(int userId, String name) {
     showDialog(
       context: context,
@@ -123,11 +164,54 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
     );
   }
 
+  void _confirmBulkDelete() {
+    final count = _selectedUserIds.length;
+    if (count == 0) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Selected Users'),
+        content: Text(
+          'Are you sure you want to delete $count selected ${widget.role == 'student' ? 'students' : 'alumni'}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _bulkDeleteUsers();
+            },
+            child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isSelectionMode = _selectedUserIds.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(isSelectionMode ? '${_selectedUserIds.length} Selected' : widget.title),
+        actions: [
+          if (isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: 'Delete selected',
+              onPressed: _confirmBulkDelete,
+            ),
+          if (isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Clear selection',
+              onPressed: () => setState(() => _selectedUserIds.clear()),
+            ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -178,7 +262,9 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
                 separatorBuilder: (context, index) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final user = _filtered[index];
+                  final isSelected = _selectedUserIds.contains(user.userId);
                   return ListTile(
+                    selected: isSelected,
                     leading: Hero(
                       tag: 'profile_${user.userId}',
                       child: CircleAvatar(
@@ -208,6 +294,18 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Checkbox(
+                          value: isSelected,
+                          onChanged: (_) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedUserIds.remove(user.userId);
+                              } else {
+                                _selectedUserIds.add(user.userId);
+                              }
+                            });
+                          },
+                        ),
                         IconButton(
                           icon: const Icon(
                             Icons.delete_outline,
@@ -221,12 +319,32 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
                       ],
                     ),
                     onTap: () {
+                      if (isSelectionMode) {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedUserIds.remove(user.userId);
+                          } else {
+                            _selectedUserIds.add(user.userId);
+                          }
+                        });
+                        return;
+                      }
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => ProfileDetailScreen(user: user),
                         ),
                       );
+                    },
+                    onLongPress: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedUserIds.remove(user.userId);
+                        } else {
+                          _selectedUserIds.add(user.userId);
+                        }
+                      });
                     },
                   );
                 },

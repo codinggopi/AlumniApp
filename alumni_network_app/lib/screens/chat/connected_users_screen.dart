@@ -38,6 +38,33 @@ class _ConnectedUsersScreenState extends State<ConnectedUsersScreen> {
     setState(() => _isLoading = true);
 
     try {
+      if (currentUser.role == 'admin') {
+        final response = await _api.get('/users');
+        if (response.statusCode != 200) {
+          throw Exception('Server returned ${response.statusCode}: ${response.body}');
+        }
+
+        final List<dynamic> data = jsonDecode(response.body);
+        final users = data
+            .whereType<Map<String, dynamic>>()
+            .map(User.fromJson)
+            .where(
+              (user) =>
+                  user.userId != currentUser.userId &&
+                  (user.role == 'student' || user.role == 'alumni'),
+            )
+            .toList()
+          ..sort((a, b) {
+            final roleOrderA = a.role == 'alumni' ? 0 : 1;
+            final roleOrderB = b.role == 'alumni' ? 0 : 1;
+            if (roleOrderA != roleOrderB) return roleOrderA.compareTo(roleOrderB);
+            return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+          });
+
+        setState(() => _users = users);
+        return;
+      }
+
       final response = await _api.get(
         '/connections?user_id=${currentUser.userId}&role=${currentUser.role}&status=accepted',
       );
@@ -97,8 +124,13 @@ class _ConnectedUsersScreenState extends State<ConnectedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = Provider.of<AuthProvider>(context).user;
-    final peerLabel = currentUser?.role == 'alumni' ? 'Students & Admins' : 'Alumni';
+    final peerLabel = currentUser?.role == 'alumni'
+        ? 'Students & Admins'
+        : currentUser?.role == 'admin'
+        ? 'Students & Alumni'
+        : 'Alumni';
     final isAlumni = currentUser?.role == 'alumni';
+    final isAdmin = currentUser?.role == 'admin';
 
     return Scaffold(
       appBar: AppBar(title: Text('Connected $peerLabel')),
@@ -113,10 +145,14 @@ class _ConnectedUsersScreenState extends State<ConnectedUsersScreen> {
                       EmptyStateWidget(
                         icon: isAlumni
                             ? Icons.school
+                            : isAdmin
+                            ? Icons.group
                             : Icons.people_outline,
                         title: 'No Connected $peerLabel',
                         message: isAlumni
                             ? 'Connected students and admin contacts will appear here.'
+                            : isAdmin
+                            ? 'Students and alumni will appear here for direct admin messaging.'
                             : 'Accepted alumni connections will appear here.',
                         onRetry: _fetchConnectedUsers,
                       ),
