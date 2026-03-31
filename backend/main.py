@@ -45,7 +45,18 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://localhost:52000",
+        "http://localhost:53000",
+        "http://localhost:54000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_origin_regex=r"https://.*\.ngrok.*|http://localhost:.*|http://127\.0\.0\.1:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -384,6 +395,112 @@ def register_with_password(payload: AuthRegisterRequest, current_user: models.Us
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role,
+    }
+
+
+@app.post("/auth/bulk-register", tags=["auth"])
+async def bulk_register(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a CSV or Excel file to bulk register students/alumni.
+    Required columns: full_name, email, password, role
+    Optional columns: phone, department, graduation_year, city, company, job_title
+    """
+    import io
+    import csv
+
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can bulk register users")
+
+    content = await file.read()
+    filename = file.filename.lower()
+
+    rows = []
+
+    if filename.endswith(".csv"):
+        decoded = content.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(decoded))
+        rows = list(reader)
+    elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(content))
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append(dict(zip(headers, row)))
+        except ImportError:
+            raise HTTPException(status_code=400, detail="openpyxl not installed. Use CSV format instead.")
+    else:
+        raise HTTPException(status_code=400, detail="Only .csv, .xlsx, or .xls files are supported")
+
+    required_cols = {"full_name", "email", "password", "role"}
+    if rows and not required_cols.issubset(set(rows[0].keys())):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required columns. Need: {', '.join(required_cols)}"
+        )
+
+    results = {"success": [], "skipped": [], "errors": []}
+
+    for i, row in enumerate(rows, start=2):
+        try:
+            email = str(row.get("email", "")).strip()
+            full_name = str(row.get("full_name", "")).strip()
+            password = str(row.get("password", "")).strip()
+            role = str(row.get("role", "")).strip().lower()
+
+            if not email or not full_name or not password or not role:
+                results["errors"].append({"row": i, "reason": "Missing required field"})
+                continue
+
+            if role not in {"student", "alumni"}:
+                results["errors"].append({"row": i, "email": email, "reason": f"Invalid role '{role}'"})
+                continue
+
+            existing = db.query(models.User).filter(models.User.email == email).first()
+            if existing:
+                results["skipped"].append({"row": i, "email": email, "reason": "Email already exists"})
+                continue
+
+            user = models.User(
+                email=email,
+                full_name=full_name,
+                role=role,
+                password_hash=hash_password(password),
+                is_verified=True,
+                phone=str(row.get("phone", "") or "").strip() or None,
+                department=str(row.get("department", "") or "").strip() or None,
+                graduation_year=int(row["graduation_year"]) if row.get("graduation_year") else None,
+                city=str(row.get("city", "") or "").strip() or None,
+            )
+            db.add(user)
+            db.flush()
+
+            if role == "student":
+                db.add(models.StudentProfile(student_id=user.user_id))
+            if role == "alumni":
+                profile = models.AlumniProfile(alumni_id=user.user_id)
+                profile.company = str(row.get("company", "") or "").strip() or None
+                profile.job_title = str(row.get("job_title", "") or "").strip() or None
+                db.add(profile)
+
+            db.commit()
+            results["success"].append({"row": i, "email": email, "role": role})
+
+        except Exception as e:
+            db.rollback()
+            results["errors"].append({"row": i, "reason": str(e)})
+
+    return {
+        "total": len(rows),
+        "registered": len(results["success"]),
+        "skipped": len(results["skipped"]),
+        "errors": len(results["errors"]),
+        "details": results,
     }
 
 
@@ -747,7 +864,28 @@ def list_internships(
         query = query.filter(models.Internship.location.ilike(f"%{location}%"))
     if stipend:
         query = query.filter(models.Internship.stipend.ilike(f"%{stipend}%"))
-    return query.order_by(models.Internship.created_at.desc()).all()
+    internships = query.order_by(models.Internship.created_at.desc()).all()
+
+    result = []
+    for i in internships:
+        poster = db.query(models.User).filter(models.User.user_id == i.posted_by).first()
+        result.append({
+            "internship_id": i.internship_id,
+            "posted_by": i.posted_by,
+            "posted_by_name": poster.full_name if poster else "Unknown",
+            "company_name": i.company,
+            "role_title": i.role_title,
+            "description": i.description,
+            "location": i.location,
+            "duration": i.duration,
+            "stipend": i.stipend,
+            "skills_required": i.required_skills,
+            "apply_deadline": i.deadline,
+            "seats_available": i.seats,
+            "status": i.status,
+            "created_at": i.created_at.isoformat(),
+        })
+    return result
 
 
 @app.post("/applications", tags=["applications"])
@@ -767,18 +905,82 @@ def apply_for_internship(payload: ApplicationCreate, db: Session = Depends(get_d
 
     application = models.Application(**payload_dict(payload))
     db.add(application)
+    db.flush()
+
+    # Notify the alumni who posted this internship
+    notification = models.Notification(
+        user_id=internship.posted_by,
+        message=f"{student.full_name} applied for your '{internship.role_title}' internship at {internship.company}.",
+        is_read=False,
+    )
+    db.add(notification)
     db.commit()
     db.refresh(application)
     return {"application_id": application.application_id, "status": application.status}
 
 
+@app.get("/internships/{internship_id}/applicants", tags=["applications"])
+def get_internship_applicants(
+    internship_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    internship = get_internship_by_id(db, internship_id)
+    if current_user.role not in {"alumni", "admin"}:
+        raise HTTPException(status_code=403, detail="Only alumni or admin can view applicants")
+    if current_user.role == "alumni" and internship.posted_by != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only view applicants for your own internships")
+
+    applications = db.query(models.Application).filter(
+        models.Application.internship_id == internship_id
+    ).order_by(models.Application.applied_at.desc()).all()
+
+    result = []
+    for app in applications:
+        student = db.query(models.User).filter(models.User.user_id == app.student_id).first()
+        student_profile = db.query(models.StudentProfile).filter(
+            models.StudentProfile.student_id == app.student_id
+        ).first()
+        result.append({
+            "application_id": app.application_id,
+            "status": app.status,
+            "cover_note": app.cover_note,
+            "applied_at": app.applied_at.isoformat(),
+            "student": {
+                "user_id": student.user_id,
+                "full_name": student.full_name,
+                "email": student.email,
+                "phone": student.phone,
+                "department": student.department,
+                "graduation_year": student.graduation_year,
+                "city": student.city,
+                "skills": student_profile.skills if student_profile else None,
+                "resume_url": student_profile.resume_url if student_profile else None,
+            } if student else None,
+        })
+    return result
+
+
 @app.patch("/applications/{application_id}", tags=["applications"])
-def update_application_status(application_id: int, payload: ApplicationStatusUpdate, db: Session = Depends(get_db)):
+def update_application_status(
+    application_id: int,
+    payload: ApplicationStatusUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Only alumni can update application status")
+
     allowed_statuses = {"Applied", "Shortlisted", "Rejected", "Selected"}
     if payload.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Invalid application status")
 
     application = get_application_by_id(db, application_id)
+
+    # Ensure the alumni owns the internship this application belongs to
+    internship = get_internship_by_id(db, application.internship_id)
+    if internship.posted_by != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only update status for your own internship applicants")
 
     application.status = payload.status
     db.commit()
@@ -1194,13 +1396,12 @@ def list_messages(user_id: int, other_user_id: int, current_user: models.User = 
     get_user_by_id(db, user_id)
     get_user_by_id(db, other_user_id)
     
-    # Ensure current user is part of the chat or is admin
     if current_user.user_id != user_id and current_user.user_id != other_user_id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized to see these messages")
 
     ensure_connected(db, user_id, other_user_id)
 
-    return db.query(models.Message).filter(
+    messages = db.query(models.Message).filter(
         (
             (models.Message.sender_id == user_id)
             & (models.Message.receiver_id == other_user_id)
@@ -1210,6 +1411,35 @@ def list_messages(user_id: int, other_user_id: int, current_user: models.User = 
             & (models.Message.receiver_id == user_id)
         )
     ).order_by(models.Message.sent_at.asc()).all()
+
+    # Mark messages sent to current user as read
+    db.query(models.Message).filter(
+        models.Message.sender_id == other_user_id,
+        models.Message.receiver_id == current_user.user_id,
+        models.Message.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+
+    return [
+        {
+            "message_id": m.message_id,
+            "sender_id": m.sender_id,
+            "receiver_id": m.receiver_id,
+            "content": m.content,
+            "sent_at": m.sent_at.isoformat(),
+            "is_read": m.is_read,
+        }
+        for m in messages
+    ]
+
+
+@app.get("/messages/unread-count", tags=["messages"])
+def get_unread_count(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    count = db.query(models.Message).filter(
+        models.Message.receiver_id == current_user.user_id,
+        models.Message.is_read == False,
+    ).count()
+    return {"unread_count": count}
 
 
 @app.post("/notifications")

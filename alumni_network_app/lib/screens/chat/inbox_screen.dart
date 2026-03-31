@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/message_count_provider.dart';
 import '../../widgets/empty_state.dart';
 import 'chat_room_screen.dart';
 import 'connected_users_screen.dart';
@@ -23,6 +24,10 @@ class _InboxScreenState extends State<InboxScreen> {
   void initState() {
     super.initState();
     _fetchConversations();
+    // Refresh unread count when inbox opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MessageCountProvider>(context, listen: false).fetchCount();
+    });
   }
 
   Future<void> _fetchConversations() async {
@@ -51,47 +56,64 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Messages', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'My Messages',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _conversations.isEmpty
-              ? EmptyStateWidget(
-                  icon: Icons.chat_bubble_outline,
-                  title: 'No Conversations',
-                  message: currentUser?.role == 'alumni'
-                      ? 'Start a chat with your connected students or with admin.'
-                      : 'Start a new conversation to connect with others!',
-                  onRetry: _fetchConversations,
-                )
-              : ListView.separated(
-                  itemCount: _conversations.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final otherUser = _conversations[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: (otherUser.profilePictureUrl != null && otherUser.profilePictureUrl!.isNotEmpty)
-                            ? NetworkImage(otherUser.profilePictureUrl!.startsWith('http') ? otherUser.profilePictureUrl! : '${ApiService.baseUrl}${otherUser.profilePictureUrl}')
-                            : null,
-                        child: (otherUser.profilePictureUrl == null || otherUser.profilePictureUrl!.isEmpty)
-                            ? const Icon(Icons.person)
-                            : null,
+          ? EmptyStateWidget(
+              icon: Icons.chat_bubble_outline,
+              title: 'No Conversations',
+              message: currentUser?.role == 'alumni'
+                  ? 'Start a chat with your connected students or with admin.'
+                  : 'Start a new conversation to connect with others!',
+              onRetry: _fetchConversations,
+            )
+          : ListView.separated(
+              itemCount: _conversations.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final otherUser = _conversations[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage:
+                        (otherUser.profilePictureUrl != null &&
+                            otherUser.profilePictureUrl!.isNotEmpty)
+                        ? NetworkImage(
+                            otherUser.profilePictureUrl!.startsWith('http')
+                                ? otherUser.profilePictureUrl!
+                                : '${ApiService.baseUrl}${otherUser.profilePictureUrl}',
+                          )
+                        : null,
+                    child:
+                        (otherUser.profilePictureUrl == null ||
+                            otherUser.profilePictureUrl!.isEmpty)
+                        ? const Icon(Icons.person)
+                        : null,
+                  ),
+                  title: Text(
+                    otherUser.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    otherUser.role.toUpperCase(),
+                    style: TextStyle(color: Colors.blue[700], fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatRoomScreen(otherUser: otherUser),
                       ),
-                      title: Text(otherUser.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(otherUser.role.toUpperCase(), style: TextStyle(color: Colors.blue[700], fontSize: 12)),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatRoomScreen(otherUser: otherUser),
-                          ),
-                        ).then((_) => _fetchConversations());
-                      },
-                    );
+                    ).then((_) => _fetchConversations());
                   },
-                ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(

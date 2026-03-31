@@ -3,10 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://alumniapp-qths.onrender.com'; // Change to IP for physical device
+  static const String baseUrl = 'https://alumniapp-qths.onrender.com'; // auto-set by run.bat
 
-  //static const String baseUrl =
-    //  'https://callum-unstigmatic-yappingly.ngrok-free.dev'; // Change to IP for physical device
+ // static const String baseUrl =
+   //   'https://callum-unstigmatic-yappingly.ngrok-free.dev'; // Change to IP for physical device
 
   //final _storage = const FlutterSecureStorage();
   final _storage = const FlutterSecureStorage();
@@ -70,14 +70,35 @@ class ApiService {
         .timeout(const Duration(seconds: 10));
   }
 
-  Future<http.StreamedResponse> upload(String endpoint, String filePath) async {
+  // Upload using bytes (works on web + mobile)
+  Future<http.StreamedResponse> uploadBytes(
+    String endpoint,
+    List<int> bytes,
+    String filename,
+  ) async {
     final token = await getToken();
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl$endpoint'),
     );
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.headers['ngrok-skip-browser-warning'] = 'true';
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: filename),
+    );
+    return await request.send().timeout(const Duration(seconds: 30));
+  }
+
+  Future<http.StreamedResponse> upload(String endpoint, String filePath) async {
+    final token = await getToken();
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl$endpoint'),
+    );
+    // Include auth + ngrok headers
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.headers['ngrok-skip-browser-warning'] = 'true';
     request.files.add(await http.MultipartFile.fromPath('file', filePath));
-    return await request.send();
+    return await request.send().timeout(const Duration(seconds: 30));
   }
 }

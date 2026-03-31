@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import 'providers/auth_provider.dart';
+import 'providers/message_count_provider.dart';
 import 'services/api_service.dart';
 import 'models/quick_action.dart';
 import 'screens/auth/login_screen.dart';
@@ -22,7 +23,10 @@ import 'screens/auth/splash_screen.dart' as animated;
 void main() {
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => MessageCountProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -61,7 +65,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     super.initState();
     // Run auth check and animation in parallel
     Provider.of<AuthProvider>(context, listen: false).checkAuth();
-    
+
     // Minimum splash duration to show animation
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) setState(() => _animationFinished = true);
@@ -77,8 +81,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return const LoginScreen();
   }
 }
-
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -102,10 +104,22 @@ class _HomeScreenState extends State<HomeScreen> {
       const EventsListScreen(),
       const InboxScreen(),
     ];
+    // Start polling for unread messages
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MessageCountProvider>(context, listen: false).startPolling();
+    });
+  }
+
+  @override
+  void dispose() {
+    Provider.of<MessageCountProvider>(context, listen: false).stopPolling();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final unread = Provider.of<MessageCountProvider>(context).unreadCount;
+
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: BottomNavigationBar(
@@ -113,12 +127,34 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
-        onTap: (index) => setState(() => _selectedIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: 'Internships'),
-          BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Events'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Messages'),
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          // Clear badge when Messages tab is tapped
+          if (index == 3) {
+            Provider.of<MessageCountProvider>(context, listen: false).reset();
+          }
+        },
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.work),
+            label: 'Internships',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.event),
+            label: 'Events',
+          ),
+          BottomNavigationBarItem(
+            label: 'Messages',
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 99 ? '99+' : '$unread'),
+              child: const Icon(Icons.chat),
+            ),
+          ),
         ],
       ),
     );
@@ -615,17 +651,16 @@ class _AnimatedActionCardState extends State<_AnimatedActionCard> {
         child: Card(
           elevation: 4,
           shadowColor: widget.color.withOpacity(0.3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  widget.color.withOpacity(0.05),
-                ],
+                colors: [Colors.white, widget.color.withOpacity(0.05)],
               ),
             ),
             child: Column(

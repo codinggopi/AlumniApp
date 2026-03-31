@@ -1,6 +1,7 @@
 class Internship {
   final int internshipId;
   final int postedBy;
+  final String postedByName;
   final String companyName;
   final String roleTitle;
   final String? description;
@@ -16,6 +17,7 @@ class Internship {
   Internship({
     required this.internshipId,
     required this.postedBy,
+    this.postedByName = 'Unknown',
     required this.companyName,
     required this.roleTitle,
     this.description,
@@ -33,6 +35,7 @@ class Internship {
     return Internship(
       internshipId: json['internship_id'],
       postedBy: json['posted_by'],
+      postedByName: json['posted_by_name'] ?? 'Unknown',
       companyName: json['company'] ?? json['company_name'],
       roleTitle: json['role_title'],
       description: json['description'],

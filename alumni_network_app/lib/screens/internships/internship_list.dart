@@ -71,9 +71,14 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Internship'),
-        content: const Text('Are you sure you want to delete this internship post? This action cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete this internship post? This action cannot be undone.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -86,13 +91,25 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
       try {
         final response = await _apiService.delete('/internships/$internshipId');
         if (response.statusCode == 200) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Internship deleted successfully')));
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Internship deleted successfully')),
+            );
           _fetchInternships();
         } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete internship'), backgroundColor: Colors.red));
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete internship'),
+                backgroundColor: Colors.red,
+              ),
+            );
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
       }
     }
   }
@@ -202,6 +219,25 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                     Text(item.location ?? "Remote"),
                                   ],
                                 ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.person_outline,
+                                      size: 16,
+                                      color: Colors.indigo,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Posted by ${item.postedBy == user?.userId ? "You" : (item.postedByName.isEmpty || item.postedByName == "Unknown" ? "Alumni #${item.postedBy}" : item.postedByName)}',
+                                      style: const TextStyle(
+                                        color: Colors.indigo,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                             trailing: Row(
@@ -211,11 +247,16 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    if (item.duration != null && item.duration!.isNotEmpty)
+                                    if (item.duration != null &&
+                                        item.duration!.isNotEmpty)
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.access_time, size: 14, color: Colors.blue),
+                                          const Icon(
+                                            Icons.access_time,
+                                            size: 14,
+                                            color: Colors.blue,
+                                          ),
                                           const SizedBox(width: 4),
                                           Text(
                                             item.duration!,
@@ -234,10 +275,15 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                     ),
                                   ],
                                 ),
-                                if (user?.role == 'alumni' && item.postedBy == user?.userId)
+                                if (user?.role == 'alumni' &&
+                                    item.postedBy == user?.userId)
                                   IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                    onPressed: () => _deleteInternship(item.internshipId),
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.redAccent,
+                                    ),
+                                    onPressed: () =>
+                                        _deleteInternship(item.internshipId),
                                   ),
                               ],
                             ),

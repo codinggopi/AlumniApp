@@ -92,6 +92,7 @@ class Message(Base):
     receiver_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     sent_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
 
     sender = relationship("User", foreign_keys=[sender_id])
     receiver = relationship("User", foreign_keys=[receiver_id])

@@ -3,14 +3,7 @@ import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Supabase PostgreSQL connection string
-# Replace the URL below with your Supabase connection string from:
-# Supabase Dashboard → Settings → Database → Connection string → URI
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "sqlite:///./alumni_app.db"
-    '''"postgresql://postgres:gopinathapp12344@db.oxynqlrgwntkfoawxraj.supabase.co:5432/postgres"'''
-    
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./alumni_app.db")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
@@ -120,3 +113,9 @@ def ensure_schema_updates():
         if "educational_details" not in st_cols:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE student_profiles ADD COLUMN educational_details TEXT"))
+
+    if "messages" in inspector.get_table_names():
+        msg_cols = {c["name"] for c in inspector.get_columns("messages")}
+        if "is_read" not in msg_cols:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN DEFAULT 0 NOT NULL"))
