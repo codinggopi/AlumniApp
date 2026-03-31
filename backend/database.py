@@ -1,9 +1,22 @@
 import os
+from typing import Optional
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./alumni_app.db")
+
+def normalize_database_url(raw_url: Optional[str]) -> str:
+    if not raw_url:
+        return "sqlite:///./alumni_app.db"
+
+    # Some hosting providers expose postgres://; SQLAlchemy expects postgresql://
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql://", 1)
+
+    return raw_url
+
+
+DATABASE_URL = normalize_database_url(os.getenv("DATABASE_URL"))
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
@@ -16,6 +29,13 @@ Base = declarative_base()
 
 def get_database_url() -> str:
     return DATABASE_URL
+
+
+if os.getenv("RENDER") and DATABASE_URL.startswith("sqlite"):
+    print(
+        "Warning: Running on Render with SQLite fallback. "
+        "Data may reset on restart/redeploy. Configure DATABASE_URL to a persistent PostgreSQL database."
+    )
 
 
 def get_session():
