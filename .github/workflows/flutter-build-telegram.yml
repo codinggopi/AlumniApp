@@ -57,7 +57,7 @@ jobs:
         if: success()
         working-directory: alumni_network_app
         env:
-          BOT_TOKEN: 8640322510:AAHOBHKgddKGU1kyRXDVbq2zxu4Zir7dFoI
+          BOT_TOKEN: 8714312440:AAFBtEnRevgKdGDTPyz-Pa-JLI40KN7n94g
           CHAT_ID: 8000518889
         run: |
           curl -F document=@build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
