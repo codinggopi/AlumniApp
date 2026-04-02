@@ -221,7 +221,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -232,14 +232,21 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             const SizedBox(height: 25),
             const Divider(),
             const SizedBox(height: 20),
-            _buildInfoRow(
-              context,
-              Icons.info_outline,
-              'Current Status',
-              widget.user.currentStatus ?? (widget.user.role == 'student'
-                  ? 'Active Student'
-                  : (widget.user.role == 'alumni' ? 'Professional Alumni' : 'Staff')),
-            ),
+            if (widget.user.role != 'staff' && (widget.user.currentStatus ?? "").isNotEmpty)
+              _buildInfoRow(
+                context,
+                Icons.info_outline,
+                'Current Status',
+                widget.user.currentStatus ?? (widget.user.role == 'student'
+                    ? 'Active Student'
+                    : 'Professional Alumni'),
+              ),
+            if (widget.user.role == 'staff') ...[
+              if ((widget.user.designation ?? "").isNotEmpty)
+                _buildInfoRow(context, Icons.badge, 'Designation', widget.user.designation!),
+              if ((widget.user.responsibilities ?? "").isNotEmpty)
+                _buildInfoRow(context, Icons.assignment_ind, 'Responsibilities', widget.user.responsibilities!),
+            ],
             if (widget.user.role == 'student') ...[
               _buildInfoRow(context, Icons.history_edu, 'Educational Details', widget.user.educationalDetails ?? 'Not Provided'),
               if (widget.user.resumeUrl != null && widget.user.resumeUrl!.isNotEmpty)

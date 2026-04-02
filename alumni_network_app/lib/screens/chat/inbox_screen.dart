@@ -78,7 +78,7 @@ class _InboxScreenState extends State<InboxScreen> {
             )
           : ListView.separated(
               itemCount: _conversations.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final otherUser = _conversations[index];
                 return ListTile(

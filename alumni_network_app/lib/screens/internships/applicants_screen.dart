@@ -66,21 +66,23 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Update Application Status'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['Applied', 'Shortlisted', 'Selected', 'Rejected'].map((s) {
-            return ListTile(
-              title: Text(s),
-              leading: Radio<String>(
-                value: s,
-                groupValue: currentStatus,
-                onChanged: (v) {
-                  Navigator.pop(context);
-                  _updateStatus(applicationId, v!);
-                },
-              ),
-            );
-          }).toList(),
+        content: RadioGroup<String>(
+          groupValue: currentStatus,
+          onChanged: (v) {
+            if (v != null) {
+              Navigator.pop(context);
+              _updateStatus(applicationId, v);
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ['Applied', 'Shortlisted', 'Selected', 'Rejected'].map((s) {
+              return ListTile(
+                title: Text(s),
+                leading: Radio<String>(value: s),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );

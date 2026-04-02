@@ -80,7 +80,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             const SizedBox(height: 15),
             if (!_otpSent) ...[
               DropdownButtonFormField<String>(
-                value: _selectedRole,
+                initialValue: _selectedRole,
                 decoration: const InputDecoration(labelText: 'Select Role', border: OutlineInputBorder()),
                 hint: const Text('Select Role'),
                 items: ['student', 'alumni', 'admin'].map((role) {

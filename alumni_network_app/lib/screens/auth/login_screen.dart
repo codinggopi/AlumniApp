@@ -116,13 +116,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 15),
                       DropdownButtonFormField<String>(
-                        value: _selectedRole,
+                        initialValue: _selectedRole,
                         decoration: const InputDecoration(
                           labelText: 'I am a...',
                           border: OutlineInputBorder(),
                         ),
                         hint: const Text('Select Role'),
-                        items: ['student', 'alumni', 'admin']
+                        items: ['student', 'alumni', 'admin', 'staff']
                             .map((role) => DropdownMenuItem(value: role, child: Text(role.toUpperCase())))
                             .toList(),
                         onChanged: (value) => setState(() => _selectedRole = value),

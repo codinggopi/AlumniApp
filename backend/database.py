@@ -101,6 +101,14 @@ def ensure_schema_updates():
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE users ADD COLUMN current_status VARCHAR(200)"))
 
+    if "designation" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN designation VARCHAR(120)"))
+
+    if "responsibilities" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN responsibilities TEXT"))
+
     if "events" in inspector.get_table_names():
         event_columns = {column["name"] for column in inspector.get_columns("events")}
         

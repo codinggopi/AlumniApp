@@ -10,6 +10,8 @@ class User {
   final String? bio;
   final String? profilePictureUrl;
   final String? currentStatus;
+  final String? designation;
+  final String? responsibilities;
   final bool isVerified;
   
   // Student specifically
@@ -36,6 +38,8 @@ class User {
     this.bio,
     this.profilePictureUrl,
     this.currentStatus,
+    this.designation,
+    this.responsibilities,
     this.isVerified = false,
     this.educationalDetails,
     this.resumeUrl,
@@ -60,6 +64,8 @@ class User {
       bio: json['bio'],
       profilePictureUrl: json['profile_picture_url'],
       currentStatus: json['current_status'],
+      designation: json['designation'],
+      responsibilities: json['responsibilities'],
       isVerified: json['is_verified'] ?? false,
       educationalDetails: json['educational_details'],
       resumeUrl: json['resume_url'],
@@ -85,6 +91,8 @@ class User {
       'bio': bio,
       'profile_picture_url': profilePictureUrl,
       'current_status': currentStatus,
+      'designation': designation,
+      'responsibilities': responsibilities,
       'is_verified': isVerified,
       'educational_details': educationalDetails,
       'resume_url': resumeUrl,

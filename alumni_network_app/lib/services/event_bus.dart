@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 /// Small app-wide event bus used to broadcast event list changes.
 /// This keeps the change local and lightweight instead of adding a full provider.
@@ -17,14 +18,14 @@ class EventBus {
     try {
       // debug log to help trace broadcasts
       // Use print so it shows in debug console regardless of logging setup
-      print('[EventBus] emitDeleted: $eventId');
+      debugPrint('[EventBus] emitDeleted: $eventId');
       _deletedController.add(eventId);
     } catch (_) {}
   }
 
   static void emitRefresh() {
     try {
-      print('[EventBus] emitRefresh');
+      debugPrint('[EventBus] emitRefresh');
       _refreshController.add(null);
     } catch (_) {}
   }

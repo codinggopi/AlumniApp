@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import 'providers/auth_provider.dart';
 import 'providers/message_count_provider.dart';
+import 'providers/notification_provider.dart';
 import 'services/api_service.dart';
 import 'models/quick_action.dart';
 import 'screens/auth/login_screen.dart';
@@ -19,6 +20,9 @@ import 'screens/admin/post_event_screen.dart';
 import 'screens/directory/alumni_directory.dart';
 import 'screens/connections/connection_requests_screen.dart';
 import 'screens/auth/splash_screen.dart' as animated;
+import 'screens/resources/resource_list_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
+import 'screens/notifications/send_notification_screen.dart';
 
 void main() {
   runApp(
@@ -26,6 +30,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => MessageCountProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: const MyApp(),
     ),
@@ -104,15 +109,20 @@ class _HomeScreenState extends State<HomeScreen> {
       const EventsListScreen(),
       const InboxScreen(),
     ];
-    // Start polling for unread messages
+    // Start polling only after auth is confirmed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<MessageCountProvider>(context, listen: false).startPolling();
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.isAuthenticated) {
+        Provider.of<MessageCountProvider>(context, listen: false).startPolling();
+        Provider.of<NotificationProvider>(context, listen: false).startPolling();
+      }
     });
   }
 
   @override
   void dispose() {
     Provider.of<MessageCountProvider>(context, listen: false).stopPolling();
+    Provider.of<NotificationProvider>(context, listen: false).stopPolling();
     super.dispose();
   }
 
@@ -217,10 +227,11 @@ class _DashboardViewState extends State<DashboardView> {
             'profile_picture_url': imageUrl,
           });
           await auth.checkAuth();
-          if (mounted)
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Profile picture updated!')),
             );
+          }
         }
       }
     } catch (e) {
@@ -292,6 +303,7 @@ class _DashboardViewState extends State<DashboardView> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          _NotificationBell(),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () => _handleLogout(context, auth),
@@ -383,7 +395,7 @@ class _DashboardViewState extends State<DashboardView> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          if (role != 'admin' ||
+                          if (role != 'admin' && role != 'staff' ||
                               (user?.currentStatus != null &&
                                   user!.currentStatus!.isNotEmpty))
                             Text(
@@ -507,6 +519,16 @@ class _DashboardViewState extends State<DashboardView> {
         color: Colors.pinkAccent,
         onTap: () => widget.onTabChange?.call(3),
       ),
+      QuickAction(
+        id: 'resources',
+        icon: Icons.library_books,
+        title: 'Resources',
+        color: Colors.amber,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ResourceListScreen()),
+        ),
+      ),
     ];
 
     if (role == 'admin') {
@@ -557,6 +579,16 @@ class _DashboardViewState extends State<DashboardView> {
             MaterialPageRoute(builder: (_) => const PostEventScreen()),
           ),
         ),
+        QuickAction(
+          id: 'send_notification',
+          icon: Icons.campaign,
+          title: 'Send Notification',
+          color: Colors.deepOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SendNotificationScreen()),
+          ),
+        ),
       ]);
     } else if (role == 'student') {
       actions.add(
@@ -584,6 +616,45 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
       );
+    } else if (role == 'staff') {
+      actions.insertAll(0, [
+        QuickAction(
+          id: 'students',
+          icon: Icons.school,
+          title: 'All Students',
+          color: Colors.indigo,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const UserListScreen(role: 'student', title: 'All Students'),
+            ),
+          ),
+        ),
+        QuickAction(
+          id: 'alumni',
+          icon: Icons.group_work,
+          title: 'All Alumnies',
+          color: Colors.teal,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const UserListScreen(role: 'alumni', title: 'All Alumnies'),
+            ),
+          ),
+        ),
+        QuickAction(
+          id: 'send_notification',
+          icon: Icons.campaign,
+          title: 'Send Notification',
+          color: Colors.deepOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SendNotificationScreen()),
+          ),
+        ),
+      ]);
     }
     return actions;
   }
@@ -614,6 +685,28 @@ class _DashboardViewState extends State<DashboardView> {
         color: color,
         onTap: onTap,
       ),
+    );
+  }
+}
+
+class _NotificationBell extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final unread = Provider.of<NotificationProvider>(context).unreadCount;
+    return IconButton(
+      icon: Badge(
+        isLabelVisible: unread > 0,
+        label: Text(unread > 99 ? '99+' : '$unread'),
+        child: const Icon(Icons.notifications_outlined),
+      ),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        ).then((_) {
+          Provider.of<NotificationProvider>(context, listen: false).fetchCount();
+        });
+      },
     );
   }
 }
@@ -650,7 +743,7 @@ class _AnimatedActionCardState extends State<_AnimatedActionCard> {
         duration: const Duration(milliseconds: 100),
         child: Card(
           elevation: 4,
-          shadowColor: widget.color.withOpacity(0.3),
+          shadowColor: widget.color.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -660,7 +753,7 @@ class _AnimatedActionCardState extends State<_AnimatedActionCard> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Colors.white, widget.color.withOpacity(0.05)],
+                colors: [Colors.white, widget.color.withValues(alpha: 0.05)],
               ),
             ),
             child: Column(
@@ -669,7 +762,7 @@ class _AnimatedActionCardState extends State<_AnimatedActionCard> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: widget.color.withOpacity(0.1),
+                    color: widget.color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(widget.icon, size: 32, color: widget.color),

@@ -141,6 +141,15 @@ class ConnectionStatusUpdate(BaseModel):
     status: str
 
 
+class ResourceCreate(BaseModel):
+    created_by: int
+    title: str
+    description: Optional[str] = None
+    resource_type: str  # 'document', 'link'
+    url: str
+    target_audience: str = "all"  # "all", "student", "alumni"
+
+
 class NotificationCreate(BaseModel):
     user_id: int
     type: Optional[str] = None
@@ -189,6 +198,8 @@ class ProfileUpdateRequest(BaseModel):
     experience_summary: Optional[str] = None
     profile_picture_url: Optional[str] = None
     current_status: Optional[str] = None
+    designation: Optional[str] = None
+    responsibilities: Optional[str] = None
     educational_details: Optional[str] = None
     skills: Optional[str] = None
     interests: Optional[str] = None
@@ -284,6 +295,8 @@ def serialize_user(user: models.User):
         "bio": user.bio,
         "profile_picture_url": user.profile_picture_url,
         "current_status": user.current_status,
+        "designation": user.designation,
+        "responsibilities": user.responsibilities,
         "is_verified": user.is_verified,
     }
 
@@ -365,7 +378,7 @@ def register_with_password(payload: AuthRegisterRequest, current_user: models.Us
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can register new users")
     
-    role = ensure_role(payload.role, {"student", "alumni", "admin"})
+    role = ensure_role(payload.role, {"student", "alumni", "admin", "staff"})
 
     existing_user = db.query(models.User).filter(models.User.email == payload.email).first()
     if existing_user:
@@ -457,7 +470,7 @@ async def bulk_register(
                 results["errors"].append({"row": i, "reason": "Missing required field"})
                 continue
 
-            if role not in {"student", "alumni"}:
+            if role not in {"student", "alumni", "staff"}:
                 results["errors"].append({"row": i, "email": email, "reason": f"Invalid role '{role}'"})
                 continue
 
@@ -506,7 +519,7 @@ async def bulk_register(
 
 @app.post("/auth/login", tags=["auth"])
 def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)):
-    role = ensure_role(payload.role, {"student", "alumni", "admin"})
+    role = ensure_role(payload.role, {"student", "alumni", "admin", "staff"})
     user = db.query(models.User).filter(
         models.User.email == payload.email,
         models.User.role == role,
@@ -538,7 +551,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not verify_stored_otp(payload.email, payload.otp):
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
     
-    role = ensure_role(payload.role, {"student", "alumni", "admin"})
+    role = ensure_role(payload.role, {"student", "alumni", "admin", "staff"})
     user = db.query(models.User).filter(
         models.User.email == payload.email,
         models.User.role == role,
@@ -557,7 +570,7 @@ def verify_otp(payload: VerifyOtpRequest, db: Session = Depends(get_db)):
     if not verify_stored_otp(payload.email, payload.otp):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    role = ensure_role(payload.role, {"student", "alumni", "admin"})
+    role = ensure_role(payload.role, {"student", "alumni", "admin", "staff"})
 
     user = db.query(models.User).filter(models.User.email == payload.email).first()
     if not user:
@@ -639,8 +652,8 @@ def list_users(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can list all users")
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Only admins or staff can list all users")
     
     query = db.query(models.User)
     if role:
@@ -708,7 +721,7 @@ def update_profile(user_id: int, payload: ProfileUpdateRequest, db: Session = De
     updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
 
     for field, value in updates.items():
-        if field in ["full_name", "phone", "department", "graduation_year", "city", "bio", "profile_picture_url"]:
+        if field in ["full_name", "phone", "department", "graduation_year", "city", "bio", "profile_picture_url", "current_status", "designation", "responsibilities"]:
             setattr(user, field, value)
 
     if user.role == "student":
@@ -1442,6 +1455,43 @@ def get_unread_count(current_user: models.User = Depends(get_current_user), db: 
     return {"unread_count": count}
 
 
+@app.post("/resources", tags=["resources"])
+def create_resource(payload: ResourceCreate, db: Session = Depends(get_db)):
+    user = get_user_by_id(db, payload.created_by)
+    if user.role not in {"staff", "admin"}:
+        raise HTTPException(status_code=400, detail="Only staff or admin users can create resources")
+
+    resource = models.Resource(**payload_dict(payload))
+    db.add(resource)
+    db.commit()
+    db.refresh(resource)
+    return {"resource_id": resource.resource_id, "message": "Resource created"}
+
+
+@app.get("/resources", tags=["resources"])
+def list_resources(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role in {"admin", "staff"}:
+        return db.query(models.Resource).order_by(models.Resource.created_at.desc()).all()
+    
+    return db.query(models.Resource).filter(
+        (models.Resource.target_audience == "all") | (models.Resource.target_audience == current_user.role)
+    ).order_by(models.Resource.created_at.desc()).all()
+
+
+@app.delete("/resources/{resource_id}", tags=["resources"])
+def delete_resource(resource_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    resource = db.query(models.Resource).filter(models.Resource.resource_id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    
+    if current_user.role not in {"admin", "staff"} and resource.created_by != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this resource")
+
+    db.delete(resource)
+    db.commit()
+    return {"status": "deleted"}
+
+
 @app.post("/notifications")
 def create_notification(payload: NotificationCreate, db: Session = Depends(get_db)):
     get_user_by_id(db, payload.user_id)
@@ -1452,12 +1502,142 @@ def create_notification(payload: NotificationCreate, db: Session = Depends(get_d
     return {"noti_id": notification.noti_id, "message": "Notification created"}
 
 
+@app.get("/notifications/unread-count", tags=["events"])
+def get_unread_notification_count(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    count = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+        models.Notification.is_read == False,
+    ).count()
+    return {"unread_count": count}
+
+
 @app.get("/notifications", tags=["events"])
-def list_notifications(user_id: int, db: Session = Depends(get_db)):
-    get_user_by_id(db, user_id)
-    return db.query(models.Notification).filter(models.Notification.user_id == user_id).order_by(models.Notification.created_at.desc()).all()
+def list_notifications(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id
+    ).order_by(models.Notification.created_at.desc()).all()
 
 
+@app.patch("/notifications/mark-all-read", tags=["events"])
+def mark_all_notifications_read(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+        models.Notification.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+    return {"status": "all_marked_read"}
+
+
+@app.delete("/notifications/clear-all", tags=["events"])
+def clear_all_notifications(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "cleared"}
+
+
+class BroadcastNotificationRequest(BaseModel):
+    title: str
+    message: str
+    target_role: str  # "all", "student", "alumni", "staff"
+
+
+@app.post("/notifications/broadcast", tags=["events"])
+def broadcast_notification(
+    payload: BroadcastNotificationRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Only admin or staff can broadcast notifications")
+
+    query = db.query(models.User)
+    if payload.target_role != "all":
+        query = query.filter(models.User.role == payload.target_role)
+
+    users = query.all()
+    full_message = f"{payload.title}: {payload.message}" if payload.title else payload.message
+
+    count = 0
+    for user in users:
+        if user.user_id == current_user.user_id:
+            continue
+        db.add(models.Notification(
+            user_id=user.user_id,
+            type="broadcast",
+            message=full_message,
+            is_read=False,
+        ))
+        count += 1
+
+    db.add(models.BroadcastLog(
+        sent_by=current_user.user_id,
+        title=payload.title,
+        message=payload.message,
+        target_role=payload.target_role,
+        recipient_count=count,
+    ))
+    db.commit()
+    return {"status": "sent", "recipients": count}
+
+
+@app.get("/notifications/sent", tags=["events"])
+def get_sent_notifications(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    logs = db.query(models.BroadcastLog).filter(
+        models.BroadcastLog.sent_by == current_user.user_id
+    ).order_by(models.BroadcastLog.created_at.desc()).all()
+
+    return [
+        {
+            "log_id": log.log_id,
+            "title": log.title,
+            "message": log.message,
+            "target_role": log.target_role,
+            "recipient_count": log.recipient_count,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]
+
+
+class BroadcastLogDeleteRequest(BaseModel):
+    log_ids: list[int]
+
+
+@app.post("/notifications/sent/delete", tags=["events"])
+def delete_broadcast_logs(
+    payload: BroadcastLogDeleteRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db.query(models.BroadcastLog).filter(
+        models.BroadcastLog.log_id.in_(payload.log_ids),
+        models.BroadcastLog.sent_by == current_user.user_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "deleted", "count": len(payload.log_ids)}
+
+
+# Parameterized routes LAST — must come after all specific /notifications/* paths
 @app.patch("/notifications/{noti_id}/read")
 def mark_notification_as_read(noti_id: int, db: Session = Depends(get_db)):
     notification = get_notification_by_id(db, noti_id)

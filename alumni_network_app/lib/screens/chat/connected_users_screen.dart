@@ -163,7 +163,7 @@ class _ConnectedUsersScreenState extends State<ConnectedUsersScreen> {
                   onRefresh: _fetchConnectedUsers,
                   child: ListView.separated(
                     itemCount: _users.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final user = _users[index];
                       return ListTile(
@@ -196,7 +196,7 @@ class _ConnectedUsersScreenState extends State<ConnectedUsersScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.12),
+                                  color: Colors.orange.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: const Text(

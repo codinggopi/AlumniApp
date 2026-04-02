@@ -91,25 +91,28 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
       try {
         final response = await _apiService.delete('/internships/$internshipId');
         if (response.statusCode == 200) {
-          if (mounted)
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Internship deleted successfully')),
             );
+          }
           _fetchInternships();
         } else {
-          if (mounted)
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Failed to delete internship'),
                 backgroundColor: Colors.red,
               ),
             );
+          }
         }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
+        }
       }
     }
   }
@@ -171,7 +174,7 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                     decoration: BoxDecoration(
                                       color: _getStatusColor(
                                         application.status,
-                                      ).withOpacity(0.1),
+                                      ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color: _getStatusColor(

@@ -31,20 +31,23 @@ class User(Base):
     bio = Column(Text, nullable=True)
     profile_picture_url = Column(String(255), nullable=True)
     current_status = Column(String(200), nullable=True)
+    designation = Column(String(120), nullable=True)
+    responsibilities = Column(Text, nullable=True)
     is_verified = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     student_profile = relationship("StudentProfile", back_populates="user", uselist=False)
     alumni_profile = relationship("AlumniProfile", back_populates="user", uselist=False)
-    sent_connections = relationship("Connection", foreign_keys="Connection.requester_id")
-    received_connections = relationship("Connection", foreign_keys="Connection.receiver_id")
-    sent_messages = relationship("Message", foreign_keys="Message.sender_id")
-    received_messages = relationship("Message", foreign_keys="Message.receiver_id")
-    internships = relationship("Internship", foreign_keys="Internship.posted_by")
-    applications = relationship("Application", foreign_keys="Application.student_id")
-    events = relationship("Event", foreign_keys="Event.created_by")
-    announcements = relationship("Announcement", foreign_keys="Announcement.created_by")
-    notifications = relationship("Notification", foreign_keys="Notification.user_id")
+    sent_connections = relationship("Connection", foreign_keys="Connection.requester_id", overlaps="requester")
+    received_connections = relationship("Connection", foreign_keys="Connection.receiver_id", overlaps="receiver")
+    sent_messages = relationship("Message", foreign_keys="Message.sender_id", overlaps="sender")
+    received_messages = relationship("Message", foreign_keys="Message.receiver_id", overlaps="receiver")
+    internships = relationship("Internship", foreign_keys="Internship.posted_by", overlaps="alumni")
+    applications = relationship("Application", foreign_keys="Application.student_id", overlaps="student")
+    events = relationship("Event", foreign_keys="Event.created_by", overlaps="admin")
+    announcements = relationship("Announcement", foreign_keys="Announcement.created_by", overlaps="admin")
+    notifications = relationship("Notification", foreign_keys="Notification.user_id", overlaps="user")
+    resources = relationship("Resource", foreign_keys="Resource.created_by", overlaps="staff")
 
 
 class StudentProfile(Base):
@@ -80,8 +83,8 @@ class Connection(Base):
     status = Column(String(20), default="pending", nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    requester = relationship("User", foreign_keys=[requester_id])
-    receiver = relationship("User", foreign_keys=[receiver_id])
+    requester = relationship("User", foreign_keys=[requester_id], overlaps="sent_connections")
+    receiver = relationship("User", foreign_keys=[receiver_id], overlaps="received_connections")
 
 
 class Message(Base):
@@ -94,8 +97,8 @@ class Message(Base):
     sent_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     is_read = Column(Boolean, default=False, nullable=False)
 
-    sender = relationship("User", foreign_keys=[sender_id])
-    receiver = relationship("User", foreign_keys=[receiver_id])
+    sender = relationship("User", foreign_keys=[sender_id], overlaps="sent_messages")
+    receiver = relationship("User", foreign_keys=[receiver_id], overlaps="received_messages")
 
 
 class Internship(Base):
@@ -115,7 +118,7 @@ class Internship(Base):
     status = Column(String(50), default="Open", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    alumni = relationship("User", foreign_keys=[posted_by])
+    alumni = relationship("User", foreign_keys=[posted_by], overlaps="internships")
     applications = relationship("Application", back_populates="internship")
 
 
@@ -131,7 +134,7 @@ class Application(Base):
     applied_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     internship = relationship("Internship", back_populates="applications")
-    student = relationship("User", foreign_keys=[student_id])
+    student = relationship("User", foreign_keys=[student_id], overlaps="applications")
 
 
 class Event(Base):
@@ -151,7 +154,7 @@ class Event(Base):
     photo_url = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    admin = relationship("User", foreign_keys=[created_by])
+    admin = relationship("User", foreign_keys=[created_by], overlaps="events")
 
 
 class Announcement(Base):
@@ -163,7 +166,7 @@ class Announcement(Base):
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    admin = relationship("User", foreign_keys=[created_by])
+    admin = relationship("User", foreign_keys=[created_by], overlaps="announcements")
 
 
 class Notification(Base):
@@ -176,4 +179,33 @@ class Notification(Base):
     is_read = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    user = relationship("User", foreign_keys=[user_id])
+    user = relationship("User", foreign_keys=[user_id], overlaps="notifications")
+
+
+class Resource(Base):
+    __tablename__ = "resources"
+
+    resource_id = Column(Integer, primary_key=True, index=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    resource_type = Column(String(50), nullable=False)  # 'document', 'link'
+    url = Column(String(255), nullable=False)
+    target_audience = Column(String(50), default="all", nullable=False)  # "all", "student", "alumni"
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    staff = relationship("User", foreign_keys=[created_by], overlaps="resources")
+
+
+class BroadcastLog(Base):
+    __tablename__ = "broadcast_logs"
+
+    log_id = Column(Integer, primary_key=True, index=True)
+    sent_by = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    target_role = Column(String(50), nullable=False)  # "all", "student", "alumni", "staff"
+    recipient_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    sender = relationship("User", foreign_keys=[sent_by], overlaps="resources")

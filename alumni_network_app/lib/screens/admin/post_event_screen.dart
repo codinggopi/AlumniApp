@@ -74,6 +74,8 @@ class _PostEventScreenState extends State<PostEventScreen> {
     setState(() => _isLoading = true);
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     final api = ApiService();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     try {
       String? docUrl;
@@ -110,10 +112,10 @@ class _PostEventScreenState extends State<PostEventScreen> {
 
       if (response.statusCode == 200 && mounted) {
         EventBus.emitRefresh();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Event posted successfully!')));
-        Navigator.pop(context, true);
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Event posted successfully!')));
+        navigator.pop(true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to post event.')));
+        if (mounted) scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Failed to post event.')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -144,7 +146,7 @@ class _PostEventScreenState extends State<PostEventScreen> {
             ),
             const SizedBox(height: 15),
             DropdownButtonFormField<String>(
-              value: _selectedAudience,
+              initialValue: _selectedAudience,
               decoration: const InputDecoration(labelText: 'Target Audience *', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('All Members')),
@@ -187,8 +189,11 @@ class _PostEventScreenState extends State<PostEventScreen> {
                               title: const Row(children: [Icon(Icons.attachment, size: 18), SizedBox(width: 5), Text('Attach Doc', style: TextStyle(fontSize: 12))]),
                               value: _hasDocument,
                               onChanged: (val) {
-                                if (val == true) _pickDocument();
-                                else setState(() { _hasDocument = false; _pickedDocumentName = null; _pickedDocumentPath = null; });
+                                if (val == true) {
+                                  _pickDocument();
+                                } else {
+                                  setState(() { _hasDocument = false; _pickedDocumentName = null; _pickedDocumentPath = null; });
+                                }
                               },
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -210,8 +215,11 @@ class _PostEventScreenState extends State<PostEventScreen> {
                               title: const Row(children: [Icon(Icons.insert_photo, size: 18), SizedBox(width: 5), Text('Add Photos', style: TextStyle(fontSize: 12))]),
                               value: _hasPhotos,
                               onChanged: (val) {
-                                if (val == true) _pickPhotos();
-                                else setState(() { _hasPhotos = false; _pickedPhotosName = null; _pickedPhotosPath = null; });
+                                if (val == true) {
+                                  _pickPhotos();
+                                } else {
+                                  setState(() { _hasPhotos = false; _pickedPhotosName = null; _pickedPhotosPath = null; });
+                                }
                               },
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10),

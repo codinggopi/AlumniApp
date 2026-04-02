@@ -120,7 +120,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 28,
-                                  backgroundColor: Colors.blue.withOpacity(0.1),
+                                  backgroundColor: Colors.blue.withValues(alpha: 0.1),
                                   child: Text(
                                     (requester['full_name'] as String).substring(0, 1).toUpperCase(),
                                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),

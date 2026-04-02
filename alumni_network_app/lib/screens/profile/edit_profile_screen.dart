@@ -14,6 +14,9 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  bool _isEditing = false;
+  bool _isLoading = false;
+
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _bioController = TextEditingController();
@@ -22,45 +25,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _eduController = TextEditingController();
   final _interestsController = TextEditingController();
   final _statusController = TextEditingController();
-  
+  final _designationController = TextEditingController();
+  final _responsibilitiesController = TextEditingController();
+
   String? _profilePictureUrl;
   String? _localImagePath;
   String? _resumeUrl;
   String? _localResumePath;
-  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _loadFromUser();
+  }
+
+  void _loadFromUser() {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
-    if (user != null) {
-      _nameController.text = user.fullName;
-      _phoneController.text = user.phone ?? "";
-      _bioController.text = user.bio ?? "";
-      _deptController.text = user.department ?? "";
-      _cityController.text = user.city ?? "";
-      _eduController.text = user.educationalDetails ?? "";
-      _interestsController.text = user.interests ?? "";
-      _statusController.text = user.currentStatus ?? "";
-      _profilePictureUrl = user.profilePictureUrl;
-      _resumeUrl = user.resumeUrl;
-    }
+    if (user == null) return;
+    _nameController.text = user.fullName;
+    _phoneController.text = user.phone ?? '';
+    _bioController.text = user.bio ?? '';
+    _deptController.text = user.department ?? '';
+    _cityController.text = user.city ?? '';
+    _eduController.text = user.educationalDetails ?? '';
+    _interestsController.text = user.interests ?? '';
+    _statusController.text = user.currentStatus ?? '';
+    _designationController.text = user.designation ?? '';
+    _responsibilitiesController.text = user.responsibilities ?? '';
+    _profilePictureUrl = user.profilePictureUrl;
+    _resumeUrl = user.resumeUrl;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _bioController.dispose();
+    _deptController.dispose();
+    _cityController.dispose();
+    _eduController.dispose();
+    _interestsController.dispose();
+    _statusController.dispose();
+    _designationController.dispose();
+    _responsibilitiesController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null && result.files.single.path != null) {
-      setState(() {
-        _localImagePath = result.files.single.path;
-      });
+      setState(() => _localImagePath = result.files.single.path);
     }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _localImagePath = null;
-      _profilePictureUrl = null;
-    });
   }
 
   Future<void> _pickResume() async {
@@ -69,23 +84,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       allowedExtensions: ['pdf', 'doc', 'docx'],
     );
     if (result != null && result.files.single.path != null) {
-      setState(() {
-        _localResumePath = result.files.single.path;
-      });
+      setState(() => _localResumePath = result.files.single.path);
     }
   }
 
   Future<String?> _uploadFile(String? localPath, String? currentUrl) async {
     if (localPath == null) return currentUrl;
-    final api = ApiService();
     try {
-      final response = await api.upload('/upload', localPath);
+      final response = await ApiService().upload('/upload', localPath);
       if (response.statusCode == 200) {
-        final data = await response.stream.bytesToString();
-        final Map<String, dynamic> decoded = jsonDecode(data);
-        if (decoded.containsKey('url')) {
-          return decoded['url'];
-        }
+        final data = jsonDecode(await response.stream.bytesToString());
+        return data['url'] ?? currentUrl;
       }
     } catch (e) {
       debugPrint('Upload error: $e');
@@ -93,15 +102,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return currentUrl;
   }
 
-  void _save() async {
+  Future<void> _save() async {
     setState(() => _isLoading = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final api = ApiService();
-
     try {
       final imageUrl = await _uploadFile(_localImagePath, _profilePictureUrl);
       final newResumeUrl = await _uploadFile(_localResumePath, _resumeUrl);
-      
+
       final Map<String, dynamic> updateData = {
         'full_name': _nameController.text,
         'phone': _phoneController.text,
@@ -110,6 +117,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'city': _cityController.text,
         'profile_picture_url': imageUrl,
         'current_status': _statusController.text,
+        'designation': _designationController.text,
+        'responsibilities': _responsibilitiesController.text,
       };
 
       if (auth.user?.role == 'student') {
@@ -120,13 +129,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
 
-      final response = await api.patch('/profile/${auth.user!.userId}', updateData);
-
+      final response = await ApiService().patch('/profile/${auth.user!.userId}', updateData);
       if (response.statusCode == 200) {
         await auth.checkAuth();
+        _loadFromUser();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated!')));
-          Navigator.pop(context);
+          setState(() {
+            _isEditing = false;
+            _localImagePath = null;
+            _localResumePath = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile updated!')),
+          );
         }
       }
     } finally {
@@ -134,104 +149,292 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  void _cancelEdit() {
+    _loadFromUser();
+    setState(() {
+      _isEditing = false;
+      _localImagePath = null;
+      _localResumePath = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
-    bool isStudent = user?.role == 'student';
-    bool isAdmin = user?.role == 'admin';
+    final role = user?.role ?? 'student';
+    final isStudent = role == 'student';
+    final isStaff = role == 'staff';
+    final isAdmin = role == 'admin';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: _localImagePath != null
-                        ? FileImage(File(_localImagePath!))
-                        : (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
-                            ? NetworkImage(_profilePictureUrl!.startsWith('http') ? _profilePictureUrl! : '${ApiService.baseUrl}$_profilePictureUrl')
-                            : null) as ImageProvider?,
-                    child: (_localImagePath == null && (_profilePictureUrl == null || _profilePictureUrl!.isEmpty))
-                        ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Edit Profile' : 'My Profile'),
+        actions: [
+          if (!_isEditing)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit Profile',
+              onPressed: () => setState(() => _isEditing = true),
+            )
+          else ...[
+            TextButton(
+              onPressed: _cancelEdit,
+              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
             ),
-            if (_localImagePath != null || (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty))
-              TextButton.icon(
-                onPressed: _removeImage,
-                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                label: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
-              ),
-            const SizedBox(height: 30),
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
-            const SizedBox(height: 15),
-            if (!isAdmin) ...[
-              TextField(controller: _statusController, decoration: const InputDecoration(labelText: 'Current Status (e.g. Seeking Internships)', border: OutlineInputBorder())),
-              const SizedBox(height: 15),
-            ],
-            TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder())),
-            const SizedBox(height: 15),
-            if (!isAdmin) ...[
-              TextField(controller: _deptController, decoration: const InputDecoration(labelText: 'Department', border: OutlineInputBorder())),
-              const SizedBox(height: 15),
-            ],
-            if (isStudent) ...[
-              TextField(controller: _eduController, maxLines: 2, decoration: const InputDecoration(labelText: 'Educational Details (School/College)', border: OutlineInputBorder())),
-              const SizedBox(height: 15),
-              TextField(controller: _interestsController, decoration: const InputDecoration(labelText: 'Interests / Skills', border: OutlineInputBorder())),
-              const SizedBox(height: 20),
-              const Align(alignment: Alignment.centerLeft, child: Text('Resume / CV', style: TextStyle(fontWeight: FontWeight.bold))),
-              const SizedBox(height: 10),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.description, color: Colors.blue),
-                title: Text(_localResumePath != null ? 'New File Selected' : (_resumeUrl != null ? 'Resume Uploaded' : 'No Resume Added')),
-                subtitle: Text(_localResumePath ?? (_resumeUrl ?? 'Upload your resume (PDF/DOCX)')),
-                trailing: IconButton(
-                  icon: const Icon(Icons.upload_file, color: Colors.blue),
-                  onPressed: _pickResume,
+          ],
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: _isEditing ? _buildEditForm(isStudent, isStaff, isAdmin) : _buildViewProfile(user, role),
+            ),
+      bottomNavigationBar: _isEditing
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(height: 15),
+            )
+          : null,
+    );
+  }
+
+  // ── VIEW MODE ──────────────────────────────────────────────────────────────
+
+  Widget _buildViewProfile(user, String role) {
+    final avatarUrl = _profilePictureUrl;
+    final isStudent = role == 'student';
+    final isStaff = role == 'staff';
+    final isAlumni = role == 'alumni';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Avatar + name header
+        Center(
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 55,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? NetworkImage(avatarUrl.startsWith('http') ? avatarUrl : '${ApiService.baseUrl}$avatarUrl')
+                    : null,
+                child: (avatarUrl == null || avatarUrl.isEmpty)
+                    ? const Icon(Icons.person, size: 55, color: Colors.grey)
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                user?.fullName ?? '',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  role.toUpperCase(),
+                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
             ],
-            TextField(controller: _cityController, decoration: const InputDecoration(labelText: 'City', border: OutlineInputBorder())),
-            const SizedBox(height: 15),
-            TextField(controller: _bioController, maxLines: 3, decoration: const InputDecoration(labelText: 'Bio', border: OutlineInputBorder())),
-            const SizedBox(height: 30),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-          ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        const Divider(),
+        const SizedBox(height: 12),
+
+        _viewRow(Icons.email, 'Email', user?.email ?? ''),
+        if (user?.phone != null && user!.phone!.isNotEmpty)
+          _viewRow(Icons.phone, 'Phone', user.phone!),
+        if (user?.city != null && user!.city!.isNotEmpty)
+          _viewRow(Icons.location_on, 'City', user.city!),
+        if (!isAdmin(role) && user?.department != null && user!.department!.isNotEmpty)
+          _viewRow(Icons.business, 'Department', user.department!),
+        if (user?.graduationYear != null)
+          _viewRow(Icons.calendar_today, 'Graduation Year', '${user!.graduationYear}'),
+
+        // Role-specific
+        if (isStaff) ...[
+          if (user?.designation != null && user!.designation!.isNotEmpty)
+            _viewRow(Icons.badge, 'Designation', user.designation!),
+          if (user?.responsibilities != null && user!.responsibilities!.isNotEmpty)
+            _viewRow(Icons.assignment_ind, 'Responsibilities', user.responsibilities!),
+        ],
+        if (isStudent) ...[
+          if (user?.currentStatus != null && user!.currentStatus!.isNotEmpty)
+            _viewRow(Icons.info_outline, 'Current Status', user.currentStatus!),
+          if (user?.educationalDetails != null && user!.educationalDetails!.isNotEmpty)
+            _viewRow(Icons.history_edu, 'Educational Details', user.educationalDetails!),
+          if (user?.interests != null && user!.interests!.isNotEmpty)
+            _viewRow(Icons.star_outline, 'Interests / Skills', user.interests!),
+          if (user?.resumeUrl != null && user!.resumeUrl!.isNotEmpty)
+            _viewRow(Icons.description, 'Resume', 'Uploaded'),
+        ],
+        if (isAlumni) ...[
+          if (user?.currentStatus != null && user!.currentStatus!.isNotEmpty)
+            _viewRow(Icons.info_outline, 'Current Status', user.currentStatus!),
+          if (user?.jobTitle != null && user!.jobTitle!.isNotEmpty)
+            _viewRow(Icons.work, 'Job Title', user.jobTitle!),
+          if (user?.company != null && user!.company!.isNotEmpty)
+            _viewRow(Icons.business_center, 'Company', user.company!),
+          if (user?.experienceSummary != null && user!.experienceSummary!.isNotEmpty)
+            _viewRow(Icons.notes, 'Experience', user.experienceSummary!),
+        ],
+
+        if (user?.bio != null && user!.bio!.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text('About', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            user.bio!,
+            style: TextStyle(color: Colors.grey[700], fontSize: 15, height: 1.5),
+          ),
+        ],
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  bool isAdmin(String role) => role == 'admin';
+
+  Widget _viewRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.blue[300], size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── EDIT MODE ──────────────────────────────────────────────────────────────
+
+  Widget _buildEditForm(bool isStudent, bool isStaff, bool isAdmin) {
+    return Column(
+      children: [
+        // Avatar picker
+        GestureDetector(
+          onTap: _pickImage,
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: _localImagePath != null
+                    ? FileImage(File(_localImagePath!))
+                    : (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
+                        ? NetworkImage(_profilePictureUrl!.startsWith('http')
+                            ? _profilePictureUrl!
+                            : '${ApiService.baseUrl}$_profilePictureUrl')
+                        : null) as ImageProvider?,
+                child: (_localImagePath == null &&
+                        (_profilePictureUrl == null || _profilePictureUrl!.isEmpty))
+                    ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_localImagePath != null ||
+            (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty))
+          TextButton.icon(
+            onPressed: () => setState(() {
+              _localImagePath = null;
+              _profilePictureUrl = null;
+            }),
+            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+            label: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+          ),
+        const SizedBox(height: 24),
+
+        _field(_nameController, 'Full Name', Icons.person),
+        if (!isAdmin && !isStaff) _field(_statusController, 'Current Status', Icons.info_outline),
+        if (isStaff) ...[
+          _field(_designationController, 'Designation', Icons.badge),
+          _field(_responsibilitiesController, 'Responsibilities / Office Info', Icons.assignment_ind, maxLines: 2),
+        ],
+        _field(_phoneController, 'Phone Number', Icons.phone),
+        if (!isAdmin) _field(_deptController, 'Department', Icons.business),
+        if (isStudent) ...[
+          _field(_eduController, 'Educational Details', Icons.history_edu, maxLines: 2),
+          _field(_interestsController, 'Interests / Skills', Icons.star_outline),
+          const SizedBox(height: 8),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Resume / CV', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.description, color: Colors.blue),
+            title: Text(_localResumePath != null
+                ? 'New File Selected'
+                : (_resumeUrl != null ? 'Resume Uploaded' : 'No Resume')),
+            subtitle: Text(_localResumePath ??
+                (_resumeUrl ?? 'Upload PDF/DOCX'),
+                overflow: TextOverflow.ellipsis),
+            trailing: IconButton(
+              icon: const Icon(Icons.upload_file, color: Colors.blue),
+              onPressed: _pickResume,
+            ),
+          ),
+        ],
+        _field(_cityController, 'City', Icons.location_on),
+        _field(_bioController, 'Bio', Icons.notes, maxLines: 3),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _field(TextEditingController ctrl, String label, IconData icon, {int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TextField(
+        controller: ctrl,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: const OutlineInputBorder(),
+          isDense: true,
         ),
       ),
     );

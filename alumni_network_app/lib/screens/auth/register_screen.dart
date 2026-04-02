@@ -41,7 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (response.statusCode == 200 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please login.'),
+            content: Text('Registration successful...!'),
           ),
         );
         Navigator.pop(context);
@@ -449,13 +449,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 15),
                       DropdownButtonFormField<String>(
-                        value: _selectedRole,
+                        initialValue: _selectedRole,
                         decoration: const InputDecoration(
                           labelText: 'Register As',
                           border: OutlineInputBorder(),
                         ),
                         hint: const Text('Select Role'),
-                        items: ['student', 'alumni']
+                        items: ['student', 'alumni', 'staff']
                             .map(
                               (role) => DropdownMenuItem(
                                 value: role,
