@@ -17,9 +17,12 @@ OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "10"))
 PASSWORD_HASH_ITERATIONS = 390000
 
 # JWT Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-for-dev-only-change-this-in-prod")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is not set in environment variables")
+
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week for mobile session
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 
 
 def _utc_now():
@@ -29,18 +32,23 @@ def _utc_now():
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     expire = _utc_now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": int(expire.timestamp())})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def generate_otp():
-    return str(random.randint(100000, 999999))
+    return str(secrets.randbelow(900000) + 100000)
+
+
+# ── OTP Hashing ────────────────────────────────────────────────────────────
+
+def _hash_otp(otp: str) -> str:
+    return hashlib.sha256(otp.encode()).hexdigest()
 
 
 # ── DB-backed OTP store ────────────────────────────────────────────────────
 
 def store_otp(email: str, otp: str):
-    """Persist OTP to DB so server reloads don't lose it."""
     try:
         from database import SessionLocal
         import models
@@ -51,13 +59,20 @@ def store_otp(email: str, otp: str):
     db = SessionLocal()
     try:
         expires_at = _utc_now() + timedelta(minutes=OTP_EXPIRY_MINUTES)
+        hashed_otp = _hash_otp(otp)
+
         existing = db.query(models.OtpStore).filter(models.OtpStore.email == email).first()
         if existing:
-            existing.otp = otp
+            existing.otp = hashed_otp
             existing.expires_at = expires_at
         else:
-            db.add(models.OtpStore(email=email, otp=otp, expires_at=expires_at))
-        db.commit()
+            db.add(models.OtpStore(email=email, otp=hashed_otp, expires_at=expires_at))
+
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
     finally:
         db.close()
 
@@ -75,15 +90,22 @@ def verify_stored_otp(email: str, otp: str) -> bool:
         entry = db.query(models.OtpStore).filter(models.OtpStore.email == email).first()
         if not entry:
             return False
-        # Make both timezone-aware for comparison
+
         expires = entry.expires_at
         if expires.tzinfo is None:
             expires = expires.replace(tzinfo=timezone.utc)
+
         if expires < _utc_now():
             db.delete(entry)
             db.commit()
             return False
-        return entry.otp == otp
+
+        if entry.otp == _hash_otp(otp):
+            db.delete(entry)  # prevent reuse
+            db.commit()
+            return True
+
+        return False
     finally:
         db.close()
 
@@ -110,23 +132,14 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
     sender_email = os.getenv("SMTP_EMAIL")
     sender_password = os.getenv("SMTP_PASSWORD")
 
-    print(f"[OTP] {email} -> {otp} (purpose: {purpose})")
-    print(f"[OTP] SMTP_EMAIL={'SET' if sender_email else 'NOT SET'}, SMTP_PASSWORD={'SET' if sender_password else 'NOT SET'}")
+    if os.getenv("ENV") == "dev":
+        print(f"[OTP] {email} -> {otp} (purpose: {purpose})")
+        print(f"[OTP] SMTP_EMAIL={'SET' if sender_email else 'NOT SET'}, SMTP_PASSWORD={'SET' if sender_password else 'NOT SET'}")
 
     if not sender_email or not sender_password:
         print("[OTP] SMTP not configured — OTP only printed above.")
         return
 
-    # Fire-and-forget in background thread so API responds immediately
-    import threading
-    threading.Thread(
-        target=_send_smtp,
-        args=(email, otp, purpose, sender_email, sender_password),
-        daemon=True,
-    ).start()
-
-
-def _send_smtp(email: str, otp: str, purpose: str, sender_email: str, sender_password: str):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
@@ -163,18 +176,20 @@ def _send_smtp(email: str, otp: str, purpose: str, sender_email: str, sender_pas
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = sender_email
+    msg["From"] = f"Alumni Network App"
     msg["To"] = email
+
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+
         print(f"[OTP] Email sent successfully to {email}")
+
     except Exception as e:
         print(f"[OTP] Failed to send email to {email}: {e}")
 
@@ -214,10 +229,12 @@ def verify_password(password: str, stored_hash: str) -> bool:
         iterations = int(iterations_str)
     except ValueError:
         return False
+
     derived = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt.encode("utf-8"),
         iterations,
     ).hex()
+
     return hmac.compare_digest(derived, expected_hash)
