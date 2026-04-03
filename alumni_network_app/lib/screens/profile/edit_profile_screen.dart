@@ -259,7 +259,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const Divider(),
         const SizedBox(height: 12),
 
-        _viewRow(Icons.email, 'Email', user?.email ?? ''),
+        _viewEmailRow(user?.email ?? '', user?.userId),
         if (user?.phone != null && user!.phone!.isNotEmpty)
           _viewRow(Icons.phone, 'Phone', user.phone!),
         if (user?.city != null && user!.city!.isNotEmpty)
@@ -332,6 +332,146 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _viewEmailRow(String email, int? userId) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.email, color: Colors.blue[300], size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Email', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(email, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: userId == null ? null : () => _showEmailChangeDialog(userId, email),
+            icon: const Icon(Icons.edit, size: 16),
+            label: const Text('Change', style: TextStyle(fontSize: 13)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              foregroundColor: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEmailChangeDialog(int userId, String currentEmail) {
+    final newEmailCtrl = TextEditingController();
+    final otpCtrl = TextEditingController();
+    bool otpSent = false;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: const Text('Change Email'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: newEmailCtrl,
+                enabled: !otpSent,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'New Email Address',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+              if (otpSent) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: otpCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP sent to new email',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.all(8),
+                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else if (!otpSent)
+              ElevatedButton(
+                onPressed: () async {
+                  final newEmail = newEmailCtrl.text.trim();
+                  if (newEmail.isEmpty || !newEmail.contains('@')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Enter a valid email')),
+                    );
+                    return;
+                  }
+                  setDlgState(() => loading = true);
+                  final res = await ApiService().post('/profile/request-email-change', {
+                    'user_id': userId,
+                    'new_email': newEmail,
+                  });
+                  setDlgState(() => loading = false);
+                  if (res.statusCode == 200) {
+                    setDlgState(() => otpSent = true);
+                  } else {
+                    final msg = jsonDecode(res.body)['detail'] ?? 'Failed to send OTP';
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  }
+                },
+                child: const Text('Send OTP'),
+              )
+            else
+              ElevatedButton(
+                onPressed: () async {
+                  final otp = otpCtrl.text.trim();
+                  if (otp.isEmpty) return;
+                  setDlgState(() => loading = true);
+                  final res = await ApiService().post('/profile/verify-email-change', {
+                    'user_id': userId,
+                    'new_email': newEmailCtrl.text.trim(),
+                    'otp': otp,
+                  });
+                  setDlgState(() => loading = false);
+                  if (res.statusCode == 200) {
+                    Navigator.pop(ctx);
+                    await Provider.of<AuthProvider>(context, listen: false).checkAuth();
+                    if (mounted) {
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Email updated successfully!')),
+                      );
+                    }
+                  } else {
+                    final msg = jsonDecode(res.body)['detail'] ?? 'Invalid OTP';
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  }
+                },
+                child: const Text('Verify & Update'),
+              ),
+          ],
+        ),
       ),
     );
   }

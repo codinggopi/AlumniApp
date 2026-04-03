@@ -83,7 +83,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 initialValue: _selectedRole,
                 decoration: const InputDecoration(labelText: 'Select Role', border: OutlineInputBorder()),
                 hint: const Text('Select Role'),
-                items: ['student', 'alumni', 'admin'].map((role) {
+                items: ['student', 'alumni', 'admin', 'staff' ].map((role) {
                   return DropdownMenuItem(value: role, child: Text(role.toUpperCase()));
                 }).toList(),
                 onChanged: (val) => setState(() => _selectedRole = val),

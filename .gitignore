@@ -19,6 +19,10 @@ env/
 venv/
 ENV/
 
+# Environment variables
+.env
+backend/.env
+
 # Python cache
 __pycache__/
 *.py[cod]

@@ -142,7 +142,7 @@ class _PostEventScreenState extends State<PostEventScreen> {
             const SizedBox(height: 15),
             TextField(
               controller: _dateController,
-              decoration: const InputDecoration(labelText: 'Date (e.g., Oct 25, 2024) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.calendar_today)),
+              decoration: const InputDecoration(labelText: 'Date (Format DD/MM/YYYY) *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.calendar_today)),
             ),
             const SizedBox(height: 15),
             DropdownButtonFormField<String>(

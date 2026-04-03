@@ -16,7 +16,6 @@ import 'screens/dashboard/customize_dashboard_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/admin/user_list_screen.dart';
-import 'screens/admin/post_event_screen.dart';
 import 'screens/directory/alumni_directory.dart';
 import 'screens/connections/connection_requests_screen.dart';
 import 'screens/auth/splash_screen.dart' as animated;
@@ -533,16 +532,7 @@ class _DashboardViewState extends State<DashboardView> {
 
     if (role == 'admin') {
       actions.insertAll(0, [
-        QuickAction(
-          id: 'register',
-          icon: Icons.person_add,
-          title: 'Register User',
-          color: Colors.red,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RegisterScreen()),
-          ),
-        ),
+        
         QuickAction(
           id: 'students',
           icon: Icons.school,
@@ -570,13 +560,16 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
         QuickAction(
-          id: 'post_event',
-          icon: Icons.add_alert,
-          title: 'Post Events',
-          color: Colors.orangeAccent,
+          id: 'staff',
+          icon: Icons.badge,
+          title: 'All Staffs',
+          color: const Color.fromARGB(255, 120, 45, 130),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const PostEventScreen()),
+            MaterialPageRoute(
+              builder: (_) =>
+                  const UserListScreen(role: 'staff', title: 'All Staffs'),
+            ),
           ),
         ),
         QuickAction(
@@ -587,6 +580,17 @@ class _DashboardViewState extends State<DashboardView> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const SendNotificationScreen()),
+          ),
+        ),
+
+        QuickAction(
+          id: 'register',
+          icon: Icons.person_add,
+          title: 'Register User',
+          color: Colors.red,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RegisterScreen()),
           ),
         ),
       ]);
@@ -641,6 +645,19 @@ class _DashboardViewState extends State<DashboardView> {
             MaterialPageRoute(
               builder: (_) =>
                   const UserListScreen(role: 'alumni', title: 'All Alumnies'),
+            ),
+          ),
+        ),
+        QuickAction(
+          id: 'staff',
+          icon: Icons.badge,
+          title: 'All Staffs',
+          color: const Color.fromARGB(255, 150, 36, 162),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const UserListScreen(role: 'staff', title: 'All Staffs'),
             ),
           ),
         ),

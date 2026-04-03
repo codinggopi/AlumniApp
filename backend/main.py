@@ -2,6 +2,10 @@ import os
 import shutil
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load .env from the backend directory
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status, Body
 from fastapi.security import OAuth2PasswordBearer
@@ -11,11 +15,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 try:
-    from .auth import ALGORITHM, SECRET_KEY, clear_otp, create_access_token, hash_password, send_otp_email, verify_password, verify_stored_otp
+    from .auth import ALGORITHM, SECRET_KEY, clear_otp, create_access_token, hash_password, send_otp_email, send_otp_email_change, verify_password, verify_stored_otp
     from .database import get_session, init_db
     from . import models
 except ImportError:
-    from auth import ALGORITHM, SECRET_KEY, clear_otp, create_access_token, hash_password, send_otp_email, verify_password, verify_stored_otp
+    from auth import ALGORITHM, SECRET_KEY, clear_otp, create_access_token, hash_password, send_otp_email, send_otp_email_change, verify_password, verify_stored_otp
     from database import get_session, init_db
     import models
 from jose import JWTError, jwt
@@ -282,8 +286,28 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
-def serialize_user(user: models.User):
-    return {
+def _notify_audience(db, target_role: str, sender_id: int, noti_type: str, message: str):
+    """Create a Notification row for every user matching target_role, excluding the sender."""
+    query = db.query(models.User)
+    if target_role != "all":
+        query = query.filter(models.User.role == target_role)
+    else:
+        # "all" means students + alumni (not admin/staff themselves)
+        query = query.filter(models.User.role.in_(["student", "alumni"]))
+
+    for user in query.all():
+        if user.user_id == sender_id:
+            continue
+        db.add(models.Notification(
+            user_id=user.user_id,
+            type=noti_type,
+            message=message,
+            is_read=False,
+        ))
+    db.commit()
+
+
+def serialize_user(user: models.User):    return {
         "user_id": user.user_id,
         "email": user.email,
         "full_name": user.full_name,
@@ -752,6 +776,45 @@ def update_profile(user_id: int, payload: ProfileUpdateRequest, db: Session = De
     return {"status": "updated"}
 
 
+class EmailChangeRequest(BaseModel):
+    user_id: int
+    new_email: str
+
+
+class EmailChangeVerifyRequest(BaseModel):
+    user_id: int
+    new_email: str
+    otp: str
+
+
+@app.post("/profile/request-email-change", tags=["profile"])
+def request_email_change(payload: EmailChangeRequest, db: Session = Depends(get_db)):
+    user = get_user_by_id(db, payload.user_id)
+
+    # Check new email not already taken
+    existing = db.query(models.User).filter(
+        models.User.email == payload.new_email,
+        models.User.user_id != payload.user_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already in use by another account")
+
+    send_otp_email_change(payload.new_email)
+    return {"message": f"OTP sent to {payload.new_email}"}
+
+
+@app.post("/profile/verify-email-change", tags=["profile"])
+def verify_email_change(payload: EmailChangeVerifyRequest, db: Session = Depends(get_db)):
+    if not verify_stored_otp(payload.new_email, payload.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    user = get_user_by_id(db, payload.user_id)
+    user.email = payload.new_email
+    db.commit()
+    clear_otp(payload.new_email)
+    return {"status": "email_updated", "new_email": payload.new_email}
+
+
 @app.delete("/profile/{user_id}")
 def delete_profile(user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if current_user.user_id != user_id and current_user.role != "admin":
@@ -1048,19 +1111,29 @@ def list_applications(
 @app.post("/events", tags=["events"])
 def create_event(payload: EventCreate, db: Session = Depends(get_db)):
     user = get_user_by_id(db, payload.created_by)
-    if user.role != "admin":
-        raise HTTPException(status_code=400, detail="Only admin users can create events")
+    if user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=400, detail="Only admin or staff can create events")
 
     event = models.Event(**payload_dict(payload))
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    # Auto-notify target audience
+    _notify_audience(
+        db=db,
+        target_role=payload.target_audience,
+        sender_id=user.user_id,
+        noti_type="event",
+        message=f"📅 New Event: {payload.title}" + (f" on {payload.date}" if payload.date else ""),
+    )
+
     return {"event_id": event.event_id, "message": "Event created"}
 
 
 @app.get("/events", tags=["events"])
 def list_events(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "staff"}:
         return db.query(models.Event).order_by(models.Event.created_at.desc()).all()
     
     return db.query(models.Event).filter(
@@ -1103,8 +1176,8 @@ def delete_event(event_id: int, current_user: models.User = Depends(get_current_
 
 @app.delete("/events", tags=["events"])
 def delete_all_events(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can delete all events")
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Only admins or staff can delete all events")
 
     db.query(models.Event).delete()
     db.commit()
@@ -1465,6 +1538,17 @@ def create_resource(payload: ResourceCreate, db: Session = Depends(get_db)):
     db.add(resource)
     db.commit()
     db.refresh(resource)
+
+    # Auto-notify target audience
+    type_label = "📄 Document" if payload.resource_type == "document" else "🔗 Link"
+    _notify_audience(
+        db=db,
+        target_role=payload.target_audience,
+        sender_id=user.user_id,
+        noti_type="broadcast",
+        message=f"{type_label} shared: {payload.title}",
+    )
+
     return {"resource_id": resource.resource_id, "message": "Resource created"}
 
 

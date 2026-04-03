@@ -105,14 +105,15 @@ class _EventsListScreenState extends State<EventsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin =
-        Provider.of<AuthProvider>(context, listen: false).user?.role == 'admin';
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    final isAdmin = user?.role == 'admin';
+    final isAdminOrStaff = isAdmin || user?.role == 'staff';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Events & News'),
         actions: [
-          if (isAdmin && _events.isNotEmpty)
+          if (isAdminOrStaff && _events.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep, color: Colors.red),
               tooltip: 'Delete All',
@@ -205,7 +206,7 @@ class _EventsListScreenState extends State<EventsListScreen> {
                 );
               },
             ),
-      floatingActionButton: isAdmin
+      floatingActionButton: isAdminOrStaff
           ? FloatingActionButton(
               onPressed: () async {
                 final result = await Navigator.push(
