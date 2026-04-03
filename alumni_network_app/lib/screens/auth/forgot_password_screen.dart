@@ -27,6 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     setState(() => _isLoading = true);
     try {
+      debugPrint("sending otp");
       final response = await ApiService().post('/send-otp', {'email': _emailController.text});
       if (response.statusCode == 200) {
         setState(() => _otpSent = true);
@@ -37,6 +38,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }
       } else {
         if (mounted) {
+          debugPrint('error (${response.statusCode})');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to send OTP (${response.statusCode})')),
           );

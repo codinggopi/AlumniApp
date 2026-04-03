@@ -110,7 +110,6 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
     sender_email = os.getenv("SMTP_EMAIL")
     sender_password = os.getenv("SMTP_PASSWORD")
 
-    # Always log to console
     print(f"[OTP] {email} -> {otp} (purpose: {purpose})")
     print(f"[OTP] SMTP_EMAIL={'SET' if sender_email else 'NOT SET'}, SMTP_PASSWORD={'SET' if sender_password else 'NOT SET'}")
 
@@ -118,6 +117,16 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
         print("[OTP] SMTP not configured — OTP only printed above.")
         return
 
+    # Fire-and-forget in background thread so API responds immediately
+    import threading
+    threading.Thread(
+        target=_send_smtp,
+        args=(email, otp, purpose, sender_email, sender_password),
+        daemon=True,
+    ).start()
+
+
+def _send_smtp(email: str, otp: str, purpose: str, sender_email: str, sender_password: str):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
@@ -130,7 +139,7 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
         subject = "Password Reset OTP — Alumni Network"
         heading = "Password Reset"
         body_text = "You requested a password reset on Alumni Network App. Use the OTP below to proceed:"
-        footer_note = "If you did not request a password reset, ignore this email..."
+        footer_note = "If you did not request a password reset, ignore this email."
 
     html_body = f"""
     <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;

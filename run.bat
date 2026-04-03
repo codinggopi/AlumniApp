@@ -25,10 +25,6 @@ if "%NGROK_URL%"=="" (
 
 echo Ngrok URL: %NGROK_URL%
 
-:: Update baseUrl in api_service.dart
-powershell -command "(Get-Content alumni_network_app\lib\services\api_service.dart) -replace 'static const String baseUrl = .*', 'static const String baseUrl = ''%NGROK_URL%''; // auto-set by run.bat' | Set-Content alumni_network_app\lib\services\api_service.dart"
-
-echo Updated api_service.dart with: %NGROK_URL%
 
 :: Start Flutter app
 start "Flutter" cmd /k "cd alumni_network_app && flutter run"
