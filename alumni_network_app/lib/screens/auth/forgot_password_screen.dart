@@ -19,12 +19,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   void _sendOtp() async {
     if (_emailController.text.isEmpty) return;
+    if (_selectedRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a role first')),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final response = await ApiService().post('/send-otp', {'email': _emailController.text});
       if (response.statusCode == 200) {
         setState(() => _otpSent = true);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP sent to your email')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('OTP sent! Check your email (also check spam)')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to send OTP (${response.statusCode})')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Network error: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

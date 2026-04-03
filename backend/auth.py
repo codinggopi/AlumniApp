@@ -112,6 +112,7 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
 
     # Always log to console
     print(f"[OTP] {email} -> {otp} (purpose: {purpose})")
+    print(f"[OTP] SMTP_EMAIL={'SET' if sender_email else 'NOT SET'}, SMTP_PASSWORD={'SET' if sender_password else 'NOT SET'}")
 
     if not sender_email or not sender_password:
         print("[OTP] SMTP not configured — OTP only printed above.")
