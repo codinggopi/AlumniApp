@@ -35,27 +35,25 @@ class ApiService {
 
   Future<http.Response> get(String endpoint) async {
     final token = await getToken();
-    return await http
-        .get(Uri.parse('$baseUrl$endpoint'), headers: _headers(token))
-        .timeout(const Duration(seconds: 30));
+    return await http.get(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _headers(token),
+    );
   }
 
   Future<http.Response> post(String endpoint, dynamic body) async {
     final token = await getToken();
-    return await http
-        .post(
-          Uri.parse('$baseUrl$endpoint'),
-          headers: _headers(token),
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+    return await http.post(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _headers(token),
+      body: jsonEncode(body),
+    );
   }
 
   Future<http.Response> delete(String endpoint) async {
     final token = await getToken();
     return await http
-        .delete(Uri.parse('$baseUrl$endpoint'), headers: _headers(token))
-        .timeout(const Duration(seconds: 30));
+        .delete(Uri.parse('$baseUrl$endpoint'), headers: _headers(token));
   }
 
   Future<http.Response> patch(String endpoint, dynamic body) async {
@@ -65,8 +63,7 @@ class ApiService {
           Uri.parse('$baseUrl$endpoint'),
           headers: _headers(token),
           body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+        );
   }
 
   // Upload using bytes (works on web + mobile)
