@@ -1,17 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
-mysql-connector-python
 python-multipart
-asgiref
-passlib[bcrypt]
 python-jose[cryptography]
-
-# Optional but recommended for production
+python-dotenv
 email-validator
-
-# PostgreSQL driver (for Render hosted DB)
 psycopg2-binary
-
-# Excel file parsing for bulk user upload
 openpyxl

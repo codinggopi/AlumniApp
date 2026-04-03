@@ -2,11 +2,11 @@ import os
 import shutil
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from dotenv import load_dotenv
-
-# Load .env from the backend directory
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass  # On Render, env vars are injected — dotenv not needed
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status, Body
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware

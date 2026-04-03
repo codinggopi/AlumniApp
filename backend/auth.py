@@ -5,11 +5,13 @@ import hashlib
 import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 from jose import jwt
 
-# Load .env — works whether running from backend/ or project root
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass  # On Render, env vars are injected — dotenv not needed
 
 OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "10"))
 PASSWORD_HASH_ITERATIONS = 390000
