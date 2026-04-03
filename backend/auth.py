@@ -173,7 +173,7 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
     """
 
     plain = f"{heading}\n\n{body_text}\n\nOTP: {otp}\n\nExpires in {OTP_EXPIRY_MINUTES} minutes.\n\n{footer_note}"
-
+    print("body parsed ",plain)
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"Alumni Network App"
@@ -181,11 +181,13 @@ def send_email(email: str, otp: str, purpose: str = "reset"):
 
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html_body, "html"))
-
+    print("msg parsed : ",msg)
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
+            print("attempt to start login")
             server.login(sender_email, sender_password)
+            print("login scucess")
             server.send_message(msg)
 
         print(f"[OTP] Email sent successfully to {email}")
