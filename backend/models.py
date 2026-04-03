@@ -215,5 +215,5 @@ class OtpStore(Base):
     __tablename__ = "otp_store"
 
     email = Column(String(255), primary_key=True, index=True)
-    otp = Column(String(10), nullable=False)
+    otp = Column(String(128),nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
