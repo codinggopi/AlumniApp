@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import 'dart:convert';
 import 'providers/auth_provider.dart';
 import 'providers/message_count_provider.dart';
@@ -206,10 +207,21 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _pickImage(AuthProvider auth) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      _uploadImage(result.files.single.path!, auth);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null) return;
+    final file = result.files.single;
+
+    String? path = file.path;
+    if (path == null && file.bytes != null) {
+      final ext = file.extension ?? 'jpg';
+      final tempPath = '${Directory.systemTemp.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await File(tempPath).writeAsBytes(file.bytes!);
+      path = tempPath;
     }
+    if (path != null) _uploadImage(path, auth);
   }
 
   Future<void> _uploadImage(String path, AuthProvider auth) async {
@@ -222,6 +234,12 @@ class _DashboardViewState extends State<DashboardView> {
         final Map<String, dynamic> decoded = jsonDecode(data);
         if (decoded.containsKey('url')) {
           final imageUrl = decoded['url'];
+          // Evict old image from cache before updating
+          final oldUrl = auth.user?.profilePictureUrl;
+          if (oldUrl != null && oldUrl.isNotEmpty) {
+            final fullOld = oldUrl.startsWith('http') ? oldUrl : '${ApiService.baseUrl}$oldUrl';
+            NetworkImage(fullOld).evict();
+          }
           await api.patch('/profile/${auth.user!.userId}', {
             'profile_picture_url': imageUrl,
           });

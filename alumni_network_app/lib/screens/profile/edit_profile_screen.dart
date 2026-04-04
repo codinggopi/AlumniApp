@@ -72,11 +72,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      setState(() => _localImagePath = result.files.single.path);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null) return;
+    final file = result.files.single;
+
+    if (file.path != null) {
+      // Android / desktop with path available
+      setState(() => _localImagePath = file.path);
+    } else if (file.bytes != null) {
+      // Web or when path not available — write to temp file
+      final ext = file.extension ?? 'jpg';
+      final tempPath = '${Directory.systemTemp.path}/picked_image_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await File(tempPath).writeAsBytes(file.bytes!);
+      setState(() => _localImagePath = tempPath);
     }
   }
+
+
+
 
   Future<void> _pickResume() async {
     final result = await FilePicker.platform.pickFiles(
@@ -93,11 +109,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final response = await ApiService().upload('/upload', localPath);
       if (response.statusCode == 200) {
-        final data = jsonDecode(await response.stream.bytesToString());
+        final body = await response.stream.bytesToString();
+        final data = jsonDecode(body);
         return data['url'] ?? currentUrl;
+      } else {
+        final body = await response.stream.bytesToString();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed ${response.statusCode}: $body'), backgroundColor: Colors.red, duration: const Duration(seconds: 6)),
+          );
+        }
       }
     } catch (e) {
-      debugPrint('Upload error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload error: $e'), backgroundColor: Colors.red, duration: const Duration(seconds: 6)),
+        );
+      }
     }
     return currentUrl;
   }
@@ -106,7 +134,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     try {
-      final imageUrl = await _uploadFile(_localImagePath, _profilePictureUrl);
+      // Upload new image if picked
+      String? imageUrl = _profilePictureUrl;
+      if (_localImagePath != null) {
+        final uploaded = await _uploadFile(_localImagePath, null);
+        if (uploaded != null) {
+          // Evict old cached image
+          if (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty) {
+            final fullOld = _profilePictureUrl!.startsWith('http')
+                ? _profilePictureUrl!
+                : '${ApiService.baseUrl}$_profilePictureUrl';
+            NetworkImage(fullOld).evict();
+          }
+          imageUrl = uploaded;
+        }
+        // If upload failed, _uploadFile already showed snackbar — still save other fields
+      }
+
       final newResumeUrl = await _uploadFile(_localResumePath, _resumeUrl);
 
       final Map<String, dynamic> updateData = {
@@ -141,6 +185,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Profile updated!')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Save failed: ${response.statusCode} ${response.body}'), backgroundColor: Colors.red, duration: const Duration(seconds: 6)),
           );
         }
       }

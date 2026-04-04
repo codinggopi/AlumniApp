@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class ApiService {
   static const String baseUrl = 'https://alumniapp-qths.onrender.com';
 
-  // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev'; // auto-set by run.bat
+  // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';
 
   //final _storage = const FlutterSecureStorage();
   final _storage = const FlutterSecureStorage();

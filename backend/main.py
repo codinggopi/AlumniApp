@@ -358,9 +358,11 @@ def ensure_connected(db: Session, sender_id: int, receiver_id: int):
     sender = get_user_by_id(db, sender_id)
     receiver = get_user_by_id(db, receiver_id)
 
-    # Only gate student <-> alumni chats. Other role combinations keep current behavior.
+    # Only gate student <-> alumni chats
+    # student <-> admin/staff is always free
+    # staff can message anyone freely
     roles = {sender.role, receiver.role}
-    if roles != {"student", "alumni"}:
+    if "staff" in roles or roles != {"student", "alumni"}:
         return None
 
     connection = db.query(models.Connection).filter(
@@ -692,7 +694,7 @@ def list_admin_contacts(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.role not in {"admin", "alumni", "student"}:
+    if current_user.role not in {"admin", "alumni", "student", "staff"}:
         raise HTTPException(status_code=403, detail="Not authorized to view admin contacts")
 
     admins = (
@@ -702,6 +704,21 @@ def list_admin_contacts(
         .all()
     )
     return [serialize_user(admin) for admin in admins]
+
+
+@app.get("/staff-contacts", tags=["admin"])
+def list_staff_contacts(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns all staff users — accessible to students for direct messaging."""
+    staff = (
+        db.query(models.User)
+        .filter(models.User.role == "staff")
+        .order_by(models.User.full_name.asc())
+        .all()
+    )
+    return [serialize_user(s) for s in staff]
 
 
 @app.get("/profile/{user_id}", tags=["profile"])
@@ -904,13 +921,29 @@ def upload_resume(user_id: int, file: UploadFile = File(...), db: Session = Depe
 
 @app.post("/upload", tags=["common"])
 def upload_file(file: UploadFile = File(...)):
-    filename = f"common_{file.filename}".replace(" ", "_")
+    cloudinary_url = os.getenv("CLOUDINARY_URL")
+
+    if cloudinary_url:
+        # Upload to Cloudinary — permanent, survives redeploys
+        import cloudinary
+        import cloudinary.uploader
+        cloudinary.config(cloudinary_url=cloudinary_url)
+        contents = file.file.read()
+        result = cloudinary.uploader.upload(
+            contents,
+            folder="alumni_network",
+            resource_type="auto",
+        )
+        return {"status": "uploaded", "url": result["secure_url"]}
+
+    # Fallback: local disk (dev only — not persistent on Render)
+    import time
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"common_{int(time.time() * 1000)}{ext}".replace(" ", "_")
     file_path = os.path.join(UPLOAD_DIR, filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
-    file_url = f"/uploads/{filename}"
-    return {"status": "uploaded", "url": file_url}
+    return {"status": "uploaded", "url": f"/uploads/{filename}"}
 
 
 @app.post("/internships", tags=["internships"])
