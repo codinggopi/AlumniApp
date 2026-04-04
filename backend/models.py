@@ -33,6 +33,7 @@ class User(Base):
     current_status = Column(String(200), nullable=True)
     designation = Column(String(120), nullable=True)
     responsibilities = Column(Text, nullable=True)
+    fcm_token = Column(String(255), nullable=True)
     is_verified = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

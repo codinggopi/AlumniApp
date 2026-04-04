@@ -23,6 +23,9 @@ ENV/
 .env
 backend/.env
 
+# Firebase service account (contains private key — never commit)
+backend/firebase-service-account.json
+
 # Python cache
 __pycache__/
 *.py[cod]

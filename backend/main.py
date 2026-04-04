@@ -8,9 +8,10 @@ try:
 except ImportError:
     pass  # On Render, env vars are injected — dotenv not needed
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status, Body
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,20 +29,57 @@ from jose import JWTError, jwt
 init_db()
 
 tags_metadata = [
-    {"name": "auth", "description": "Operations with user authentication and registration."},
-    {"name": "profile", "description": "Manage user profiles and resumes."},
-    {"name": "alumni", "description": "Explore the alumni network directory."},
-    {"name": "internships", "description": "Browse and post internship opportunities."},
-    {"name": "applications", "description": "Track and manage internship applications."},
-    {"name": "messages", "description": "One-to-one communication between members."},
-    {"name": "events", "description": "Platform-wide events and announcements."},
+    {"name": "auth",         "description": "Authentication — login, register, OTP, password reset, FCM token."},
+    {"name": "profile",      "description": "User profiles — view, update, email change, resume upload."},
+    {"name": "admin",        "description": "Admin operations — list users, bulk register, delete accounts."},
+    {"name": "alumni",       "description": "Alumni directory — search and filter alumni profiles."},
+    {"name": "internships",  "description": "Internship board — post, browse, apply, manage applications."},
+    {"name": "applications", "description": "Internship applications — track status, shortlist, select."},
+    {"name": "messages",     "description": "Direct messaging — send, edit, delete, bulk delete, conversations."},
+    {"name": "events",       "description": "Events & announcements — post, list, delete."},
+    {"name": "connections",  "description": "Connection requests — send, accept, reject between students and alumni."},
+    {"name": "resources",    "description": "Educational resources — upload documents/links, list, delete."},
+    {"name": "common",       "description": "File upload utility endpoint."},
 ]
 
 app = FastAPI(
-    title="Alumni-Student Network API",
-    description="Backend API for the Alumni-Student Networking Platform v2.0. Supports JWT authentication, real-time messaging, and internship management.",
+    title="Alumni Network API",
+    description="""
+## Alumni-Student Network Platform — REST API
+
+Built with **FastAPI** + **SQLAlchemy**. Supports JWT authentication, FCM push notifications, file uploads via Cloudinary, and real-time messaging.
+
+### Authentication
+All protected endpoints require a **Bearer JWT token**.
+
+To get a token:
+1. `POST /auth/login` with `email`, `password`, `role`
+2. Copy the `access_token` from the response
+3. Click **Authorize** (🔒) above and enter: `Bearer <your_token>`
+
+### Roles
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access — manage users, events, resources, notifications |
+| `staff` | Post events/resources, message all users, send notifications |
+| `alumni` | Post internships, connect with students, message connected users |
+| `student` | Apply to internships, connect with alumni, message connected alumni + admin/staff |
+""",
     version="2.0.0",
     openapi_tags=tags_metadata,
+    contact={
+        "name": "Alumni Network Support",
+        "email": "gajagopi2006@gmail.com",
+    },
+    license_info={
+        "name": "Private",
+    },
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": -1,   # hide schemas section by default
+        "docExpansion": "none",            # collapse all endpoints by default
+        "filter": True,                    # enable search/filter bar
+        "persistAuthorization": True,      # keep auth token across page refreshes
+    },
 )
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -177,6 +215,7 @@ class AuthLoginRequest(BaseModel):
     email: str
     password: str
     role: str
+    fcm_token: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):
@@ -551,6 +590,8 @@ def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)
         models.User.role == role,
     ).first()
 
+    print(payload)
+
     if not user:
         print(f"Login failed: User '{payload.email}' with role '{role}' not found.")
         raise HTTPException(status_code=401, detail="Invalid email, role, or password")
@@ -558,6 +599,11 @@ def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)
     if not verify_password(payload.password, user.password_hash):
         print(f"Login failed: Incorrect password for '{payload.email}'.")
         raise HTTPException(status_code=401, detail="Invalid email, role, or password")
+
+    # Store FCM token if provided
+    if payload.fcm_token:
+        user.fcm_token = payload.fcm_token
+        db.commit()
 
     access_token = create_access_token(data={"sub": str(user.user_id), "role": user.role})
 
@@ -570,6 +616,48 @@ def login_with_password(payload: AuthLoginRequest, db: Session = Depends(get_db)
         "full_name": user.full_name,
         "role": user.role,
     }
+
+
+class FcmTokenRequest(BaseModel):
+    user_id: int
+    token: str
+
+@app.post("/auth/fcm-token", tags=["auth"])
+def save_fcm_token(
+    payload: FcmTokenRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Use authenticated user — ignore user_id in body for security
+    current_user.fcm_token = payload.token
+    db.commit()
+    return {"status": "token_saved"}
+
+
+@app.post("/auth/test-fcm", tags=["auth"])
+def test_fcm_notification(db: Session = Depends(get_db)):
+    """Send a test FCM push to all admin devices. No auth required — for testing only."""
+    admins = db.query(models.User).filter(
+        models.User.role == "admin",
+        models.User.fcm_token.isnot(None),
+    ).all()
+
+    if not admins:
+        return {"status": "no_targets", "message": "No admin devices with FCM token found"}
+
+    import threading
+    for admin in admins:
+        threading.Thread(
+            target=_send_fcm_push,
+            args=(
+                admin.fcm_token,
+                "Alumni Network",
+                "FCM is working! Push notifications are set up correctly.",
+            ),
+            daemon=True,
+        ).start()
+
+    return {"status": "sent", "recipients": len(admins)}
 
 
 @app.post("/auth/reset-password", tags=["auth"])
@@ -1408,9 +1496,93 @@ def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
 
     message = models.Message(**payload_dict(payload))
     db.add(message)
+
+    # Save to notification DB
+    db.add(models.Notification(
+        user_id=receiver.user_id,
+        type="message",
+        message=f"New message from {sender.full_name}: {payload.content[:80]}{'...' if len(payload.content) > 80 else ''}",
+        is_read=False,
+    ))
+
     db.commit()
     db.refresh(message)
+
+    # Send FCM push in background thread
+    if receiver.fcm_token:
+        import threading
+        threading.Thread(
+            target=_send_fcm_push,
+            args=(receiver.fcm_token, sender.full_name, payload.content),
+            daemon=True,
+        ).start()
+
     return {"message_id": message.message_id, "sent_at": message.sent_at}
+
+
+def _send_fcm_push(token: str, sender_name: str, content: str):
+    """Send FCM push notification via HTTP v1 API using Service Account."""
+    try:
+        import json
+        import urllib.request
+
+        # Support both file path (local) and env var JSON string (Render)
+        sa_json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+        sa_path = os.path.join(os.path.dirname(__file__), "firebase-service-account.json")
+
+        if sa_json_str:
+            sa_data = json.loads(sa_json_str)
+        elif os.path.exists(sa_path):
+            with open(sa_path) as f:
+                sa_data = json.load(f)
+        else:
+            print("[FCM] No service account configured — skipping push")
+            return
+
+        from google.oauth2 import service_account
+        import google.auth.transport.requests
+
+        credentials = service_account.Credentials.from_service_account_info(
+            sa_data,
+            scopes=["https://www.googleapis.com/auth/firebase.messaging"],
+        )
+        credentials.refresh(google.auth.transport.requests.Request())
+        access_token = credentials.token
+        project_id = sa_data["project_id"]
+
+        url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+
+        body = json.dumps({
+            "message": {
+                "token": token,
+                "notification": {
+                    "title": f"New message from {sender_name}",
+                    "body": content[:100],
+                },
+                "android": {
+                    "priority": "high",
+                    "notification": {"sound": "default"},
+                },
+                "data": {
+                    "type": "message",
+                    "sender_name": sender_name,
+                },
+            }
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = resp.read().decode()
+            print(f"[FCM] Push sent: {result}")
+    except Exception as e:
+        print(f"[FCM] Push failed: {e}")
 
 
 @app.get("/conversations", tags=["messages"])
@@ -1773,3 +1945,33 @@ def delete_notification(noti_id: int, db: Session = Depends(get_db)):
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=tags_metadata,
+    )
+    schema.setdefault("components", {})
+    schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token from POST /auth/login",
+        }
+    }
+    for path in schema.get("paths", {}).values():
+        for operation in path.values():
+            if isinstance(operation, dict):
+                operation.setdefault("security", [{"BearerAuth": []}])
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi

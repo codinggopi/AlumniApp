@@ -3,12 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  //static const String baseUrl = 'https://alumniapp-qths.onrender.com';
-static const String baseUrl = 'https://alumni-app-virid.vercel.app';
+  //static const String baseUrl = 'https://alumniapp-qths.onrender.com';  //render
+    // static const String baseUrl = 'https://alumni-app-virid.vercel.app'; //vercel
 
-  // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';
+  static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';  //local host + ngrok
 
-  //final _storage = const FlutterSecureStorage();
   final _storage = const FlutterSecureStorage();
 
   Future<String?> getToken() async {

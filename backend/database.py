@@ -109,6 +109,10 @@ def ensure_schema_updates():
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE users ADD COLUMN responsibilities TEXT"))
 
+    if "fcm_token" not in user_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN fcm_token VARCHAR(255)"))
+
     if "events" in inspector.get_table_names():
         event_columns = {column["name"] for column in inspector.get_columns("events")}
         

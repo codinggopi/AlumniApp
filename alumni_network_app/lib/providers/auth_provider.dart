@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import 'dart:convert';
 
 class AuthProvider with ChangeNotifier {
@@ -12,16 +13,24 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
 
+  /// Login — sends FCM token as 3rd credential if available.
   Future<bool> login(String email, String password, String role) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await _apiService.post('/auth/login', {
+      final body = {
         'email': email,
         'password': password,
         'role': role,
-      });
+      };
+
+      // Include FCM token if already generated (permission granted during splash)
+      if (FcmService.cachedToken != null) {
+        body['fcm_token'] = FcmService.cachedToken!;
+      }
+
+      final response = await _apiService.post('/auth/login', body);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -65,7 +74,7 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await _apiService.saveToken(data['access_token']);
-        await checkAuth(); // Fetch full profile
+        await checkAuth();
         return true;
       }
     } catch (e) {
@@ -83,6 +92,8 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// checkAuth — called on app start if already logged in.
+  /// Refreshes user data AND resends FCM token using stored JWT.
   Future<void> checkAuth() async {
     final token = await _apiService.getToken();
     if (token == null) return;
@@ -92,6 +103,11 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         _user = User.fromJson(jsonDecode(response.body));
         notifyListeners();
+
+        // Resend FCM token with stored JWT for already-logged-in users
+        if (_user != null && FcmService.cachedToken != null) {
+          FcmService.refreshTokenForLoggedInUser(_user!.userId);
+        }
       } else {
         await logout();
       }
