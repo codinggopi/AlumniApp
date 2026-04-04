@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://alumniapp-qths.onrender.com';
+  //static const String baseUrl = 'https://alumniapp-qths.onrender.com';
+static const String baseUrl = 'https://alumni-app-virid.vercel.app';
 
   // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';
 
