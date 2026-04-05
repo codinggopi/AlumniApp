@@ -141,7 +141,7 @@ class EventDetailScreen extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
-                          '${ApiService.baseUrl}${event.photoUrl}',
+                          '${event.photoUrl}',
                           width: double.infinity,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
@@ -159,7 +159,7 @@ class EventDetailScreen extends StatelessWidget {
                             "View Document",
                             () => launchUrl(
                               Uri.parse(
-                                '${ApiService.baseUrl}${event.documentUrl}',
+                                '${event.documentUrl}',
                               ),
                             ),
                           ),
@@ -172,7 +172,7 @@ class EventDetailScreen extends StatelessWidget {
                             "View Full Image",
                             () => launchUrl(
                               Uri.parse(
-                                '${ApiService.baseUrl}${event.photoUrl}',
+                                '${event.photoUrl}',
                               ),
                             ),
                           ),

@@ -1022,6 +1022,7 @@ def upload_file(file: UploadFile = File(...)):
             folder="alumni_network",
             resource_type="auto",
         )
+        print(result["secure_url"])
         return {"status": "uploaded", "url": result["secure_url"]}
 
     # Fallback: local disk (dev only — not persistent on Render)
@@ -1513,20 +1514,23 @@ def create_message(payload: MessageCreate, db: Session = Depends(get_db)):
         import threading
         threading.Thread(
             target=_send_fcm_push,
-            args=(receiver.fcm_token, sender.full_name, payload.content),
+            args=(receiver.fcm_token, f"New message from {sender.full_name}", payload.content[:200]),
             daemon=True,
         ).start()
 
     return {"message_id": message.message_id, "sent_at": message.sent_at}
 
 
-def _send_fcm_push(token: str, sender_name: str, content: str):
-    """Send FCM push notification via HTTP v1 API using Service Account."""
+def _send_fcm_push(token: str, title: str, body: str, memo_id: str = ""):
+    """Send FCM push notification via HTTP v1 API (DATA ONLY — no duplicates)."""
     try:
+        import os
         import json
         import urllib.request
+        from google.oauth2 import service_account
+        import google.auth.transport.requests
 
-        # Support both file path (local) and env var JSON string (Render)
+        # Load service account
         sa_json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
         sa_path = os.path.join(os.path.dirname(__file__), "firebase-service-account.json")
 
@@ -1536,53 +1540,50 @@ def _send_fcm_push(token: str, sender_name: str, content: str):
             with open(sa_path) as f:
                 sa_data = json.load(f)
         else:
-            print("[FCM] No service account configured — skipping push")
+            print("[FCM] No service account configured")
             return
-
-        from google.oauth2 import service_account
-        import google.auth.transport.requests
 
         credentials = service_account.Credentials.from_service_account_info(
             sa_data,
             scopes=["https://www.googleapis.com/auth/firebase.messaging"],
         )
         credentials.refresh(google.auth.transport.requests.Request())
+
         access_token = credentials.token
         project_id = sa_data["project_id"]
 
         url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
 
-        body = json.dumps({
+        # ✅ DATA ONLY PAYLOAD
+        payload = json.dumps({
             "message": {
                 "token": token,
-                "notification": {
-                    "title": f"New message from {sender_name}",
-                    "body": content[:100],
+                "data": {
+                    "title": title,
+                    "body": body[:200],
+                    "memo_id": memo_id or "",
                 },
                 "android": {
-                    "priority": "high",
-                    "notification": {"sound": "default"},
-                },
-                "data": {
-                    "type": "message",
-                    "sender_name": sender_name,
-                },
+                    "priority": "high"
+                }
             }
         }).encode("utf-8")
 
         req = urllib.request.Request(
             url,
-            data=body,
+            data=payload,
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
             },
         )
+
         with urllib.request.urlopen(req, timeout=10) as resp:
             result = resp.read().decode()
-            print(f"[FCM] Push sent: {result}")
+            print(f"[FCM] Sent: {result}")
+
     except Exception as e:
-        print(f"[FCM] Push failed: {e}")
+        print(f"[FCM] Error: {e}")
 
 
 @app.get("/conversations", tags=["messages"])
@@ -1858,6 +1859,7 @@ def broadcast_notification(
     full_message = f"{payload.title}: {payload.message}" if payload.title else payload.message
 
     count = 0
+    fcm_targets = []
     for user in users:
         if user.user_id == current_user.user_id:
             continue
@@ -1867,6 +1869,8 @@ def broadcast_notification(
             message=full_message,
             is_read=False,
         ))
+        if user.fcm_token:
+            fcm_targets.append(user.fcm_token)
         count += 1
 
     db.add(models.BroadcastLog(
@@ -1877,6 +1881,17 @@ def broadcast_notification(
         recipient_count=count,
     ))
     db.commit()
+
+    # Send FCM push to all target devices in background
+    if fcm_targets:
+        import threading
+        for token in fcm_targets:
+            threading.Thread(
+                target=_send_fcm_push,
+                args=(token, payload.title, payload.message),
+                daemon=True,
+            ).start()
+
     return {"status": "sent", "recipients": count}
 
 
