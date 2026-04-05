@@ -4,9 +4,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
   //static const String baseUrl = 'https://alumniapp-qths.onrender.com';  //render
-    // static const String baseUrl = 'https://alumni-app-virid.vercel.app'; //vercel
+    static const String baseUrl = 'https://alumni-app-virid.vercel.app'; //vercel
 
-  static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';  //local host + ngrok
+  // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';  //local host + ngrok
 
   final _storage = const FlutterSecureStorage();
 
