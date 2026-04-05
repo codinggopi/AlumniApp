@@ -9,23 +9,40 @@ import 'api_service.dart';
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
 
+/// BACKGROUND HANDLER
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  // Only show local notification for data-only messages.
-  // If notification payload exists, Android shows it automatically — don't duplicate.
+
+  // Only show notification manually for DATA-ONLY messages
   if (message.notification == null) {
     _showLocalNotification(message);
   }
 }
 
+/// LOCAL NOTIFICATION DISPLAY FUNCTION
 void _showLocalNotification(RemoteMessage message) {
-  final notification = message.notification;
-  if (notification == null) return;
+  String? title;
+  String? body;
+
+  // Notification payload
+  if (message.notification != null) {
+    title = message.notification!.title;
+    body = message.notification!.body;
+  }
+
+  // Data payload fallback
+  if (message.data.isNotEmpty) {
+    title ??= message.data['title'];
+    body ??= message.data['body'];
+  }
+
+  if (title == null && body == null) return;
+
   _localNotifications.show(
-    notification.hashCode,
-    notification.title,
-    notification.body,
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body,
     const NotificationDetails(
       android: AndroidNotificationDetails(
         'alumni_network_channel',
@@ -42,23 +59,25 @@ void _showLocalNotification(RemoteMessage message) {
 class FcmService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
-  // Cached token — generated once at startup
   static String? _cachedToken;
   static String? get cachedToken => _cachedToken;
 
-  /// Call once at app start — initializes Firebase, local notifications,
-  /// requests permission, and pre-generates the FCM token.
+  /// INITIALIZE EVERYTHING (CALL IN main.dart)
   static Future<void> initialize() async {
     await Firebase.initializeApp();
 
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    /// Background messages
+    FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler);
 
+    /// Local notifications init
     await _localNotifications.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
     );
 
+    /// Create notification channel
     await _localNotifications
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -71,29 +90,36 @@ class FcmService {
           ),
         );
 
-    FirebaseMessaging.onMessage.listen(_showLocalNotification);
+    /// FOREGROUND HANDLER (ALWAYS SHOW MANUALLY)
+    FirebaseMessaging.onMessage.listen((message) {
+      _showLocalNotification(message);
+    });
+
+    /// OPTIONAL: handle when user taps notification
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      debugPrint('[FCM] Notification clicked');
+    });
   }
 
-  /// Request notification permission during splash screen.
-  /// Returns true if granted.
+  /// REQUEST PERMISSION
   static Future<bool> requestPermission(BuildContext context) async {
     if (!context.mounted) return false;
 
     if (Platform.isAndroid) {
       final status = await Permission.notification.status;
+
       if (status.isGranted) {
         await _generateToken();
         return true;
       }
 
       if (status.isPermanentlyDenied) {
-        if (!context.mounted) return false;
         final open = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Enable Notifications'),
             content: const Text(
-              'Notifications are blocked. Open Settings to enable them so you don\'t miss important updates.',
+              'Notifications are blocked. Open Settings to enable them.',
             ),
             actions: [
               TextButton(
@@ -107,54 +133,66 @@ class FcmService {
             ],
           ),
         );
+
         if (open == true) await openAppSettings();
         return false;
       }
 
       final result = await Permission.notification.request();
+
       if (result.isGranted) {
         await _generateToken();
         return true;
       }
+
       return false;
     }
 
-    // iOS
+    /// iOS
     final settings = await _messaging.requestPermission(
-      alert: true, badge: true, sound: true,
+      alert: true,
+      badge: true,
+      sound: true,
     );
-    final granted = settings.authorizationStatus == AuthorizationStatus.authorized;
+
+    final granted =
+        settings.authorizationStatus == AuthorizationStatus.authorized;
+
     if (granted) await _generateToken();
+
     return granted;
   }
 
-  /// Pre-generate and cache the FCM token.
+  /// GENERATE TOKEN
   static Future<void> _generateToken() async {
     try {
       _cachedToken = await _messaging.getToken();
-      debugPrint('[FCM] Token ready: $_cachedToken');
+      debugPrint('[FCM] Token: $_cachedToken');
     } catch (e) {
-      debugPrint('[FCM] Token generation error: $e');
+      debugPrint('[FCM] Token error: $e');
     }
   }
 
-  /// Send cached token to backend using the stored JWT (for already-logged-in users).
+  /// SEND TOKEN TO BACKEND
   static Future<void> refreshTokenForLoggedInUser(int userId) async {
     if (_cachedToken == null) await _generateToken();
     if (_cachedToken == null) return;
+
     try {
       await ApiService().post('/auth/fcm-token', {
         'user_id': userId,
         'token': _cachedToken,
       });
-      debugPrint('[FCM] Token refreshed for user $userId');
+
+      debugPrint('[FCM] Token sent for user $userId');
     } catch (e) {
-      debugPrint('[FCM] Refresh token error: $e');
+      debugPrint('[FCM] Send token error: $e');
     }
 
-    // Keep token fresh
+    /// Listen for token refresh
     _messaging.onTokenRefresh.listen((newToken) {
       _cachedToken = newToken;
+
       ApiService().post('/auth/fcm-token', {
         'user_id': userId,
         'token': newToken,
