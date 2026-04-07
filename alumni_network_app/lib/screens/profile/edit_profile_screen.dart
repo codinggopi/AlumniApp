@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/permission_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -72,6 +73,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
+    final granted = await PermissionService.checkMediaPermission(context);
+    if (!granted) return;
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       withData: true,
@@ -95,6 +99,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
 
   Future<void> _pickResume() async {
+    final granted = await PermissionService.checkMediaPermission(context);
+    if (!granted) return;
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx'],
@@ -316,7 +323,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _viewRow(Icons.location_on, 'City', user.city!),
         if (!isAdmin(role) && user?.department != null && user!.department!.isNotEmpty)
           _viewRow(Icons.business, 'Department', user.department!),
-        if (user?.graduationYear != null)
+        if (user?.graduationYear != null && role != 'staff')
           _viewRow(Icons.calendar_today, 'Graduation Year', '${user!.graduationYear}'),
 
         // Role-specific

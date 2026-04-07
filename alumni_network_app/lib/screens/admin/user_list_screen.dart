@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../models/user.dart';
 import '../../widgets/empty_state.dart';
 import '../directory/profile_detail.dart';
+import 'admin_edit_profile_screen.dart';
 
 class UserListScreen extends StatefulWidget {
   final String role; // 'student' or 'alumni'
@@ -289,7 +290,9 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      '${user.department ?? "No Dept"} | ${user.graduationYear ?? "No Year"}',
+                      user.role == 'staff'
+                          ? user.department ?? 'No Dept'
+                          : '${user.department ?? "No Dept"} | ${user.graduationYear ?? "No Year"}',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -304,6 +307,19 @@ class _UserListScreenState extends State<UserListScreen> with RouteAware {
                                 _selectedUserIds.add(user.userId);
                               }
                             });
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                          tooltip: 'Edit profile',
+                          onPressed: () async {
+                            final updated = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AdminEditProfileScreen(user: user),
+                              ),
+                            );
+                            if (updated == true) _fetchUsers();
                           },
                         ),
                         IconButton(

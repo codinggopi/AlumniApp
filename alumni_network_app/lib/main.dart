@@ -9,6 +9,7 @@ import 'providers/message_count_provider.dart';
 import 'providers/notification_provider.dart';
 import 'services/api_service.dart';
 import 'services/fcm_service.dart';
+import 'services/permission_service.dart';
 import 'models/quick_action.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/internships/internship_list.dart';
@@ -27,7 +28,10 @@ import 'screens/notifications/send_notification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await FcmService.initialize();
+  await ApiService.init();
+  
   runApp(
     MultiProvider(
       providers: [
@@ -71,21 +75,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    // Run auth check and permission request in parallel during splash
     Provider.of<AuthProvider>(context, listen: false).checkAuth();
     _requestPermissions();
-
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) setState(() => _animationFinished = true);
     });
   }
 
   Future<void> _requestPermissions() async {
-    // Small delay so splash UI renders first
     await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      await FcmService.requestPermission(context);
-    }
+    if (mounted) await FcmService.requestPermission(context);
   }
 
   @override
@@ -218,6 +217,9 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _pickImage(AuthProvider auth) async {
+    final granted = await PermissionService.checkMediaPermission(context);
+    if (!granted) return;
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       withData: true,

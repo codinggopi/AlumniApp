@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_service.dart';
+import 'permission_service.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
@@ -137,24 +138,49 @@ class FcmService {
 
   /// ── PERMISSION ─────────────────────────
   static Future<bool> requestPermission(BuildContext context) async {
+    // Request media permissions at the same time
+    await PermissionService.requestAllPermissions(context);
+
     if (Platform.isAndroid) {
       final status = await Permission.notification.status;
+      if (status.isGranted) return true;
 
-      if (status.isGranted) {
-        return true;
+      if (status.isPermanentlyDenied) {
+        if (!context.mounted) return false;
+        final open = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Enable Notifications'),
+            content: const Text(
+              'Notifications are blocked. Open Settings to enable them so you don\'t miss important updates.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Not Now'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        if (open == true) await openAppSettings();
+        return false;
       }
 
       final result = await Permission.notification.request();
+      if (result.isGranted) await _generateToken();
       return result.isGranted;
     }
 
     final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
+      alert: true, badge: true, sound: true,
     );
-
-    return settings.authorizationStatus == AuthorizationStatus.authorized;
+    final granted = settings.authorizationStatus == AuthorizationStatus.authorized;
+    if (granted) await _generateToken();
+    return granted;
   }
 
   /// ── TOKEN ─────────────────────────

@@ -1045,6 +1045,58 @@ def create_internship(payload: InternshipCreate, db: Session = Depends(get_db)):
     db.add(internship)
     db.commit()
     db.refresh(internship)
+
+    notif_title = f"💼 New Internship: {payload.role_title}"
+    notif_body = f"{payload.company}" + (f" | {payload.location}" if payload.location else "") + f" — Posted by {user.full_name}"
+
+    # Get connected students of this alumni
+    connections = db.query(models.Connection).filter(
+        models.Connection.requester_id == user.user_id,
+        models.Connection.status == "accepted",
+    ).all()
+    connected_student_ids = {c.receiver_id for c in connections}
+
+    # Also get connections where alumni is receiver
+    connections2 = db.query(models.Connection).filter(
+        models.Connection.receiver_id == user.user_id,
+        models.Connection.status == "accepted",
+    ).all()
+    connected_student_ids.update(c.requester_id for c in connections2)
+
+    # Get admin and staff users
+    staff_admins = db.query(models.User).filter(
+        models.User.role.in_(["admin", "staff"])
+    ).all()
+    staff_admin_ids = {u.user_id for u in staff_admins}
+
+    # All target user IDs
+    target_ids = connected_student_ids | staff_admin_ids
+
+    import threading
+    for target_id in target_ids:
+        # Save to notification DB
+        db.add(models.Notification(
+            user_id=target_id,
+            type="event",
+            message=f"{notif_title} — {notif_body}",
+            is_read=False,
+        ))
+
+    db.commit()
+
+    # Send FCM push to targets with tokens
+    targets_with_tokens = db.query(models.User).filter(
+        models.User.user_id.in_(target_ids),
+        models.User.fcm_token.isnot(None),
+    ).all()
+
+    for target in targets_with_tokens:
+        threading.Thread(
+            target=_send_fcm_push,
+            args=(target.fcm_token, notif_title, notif_body),
+            daemon=True,
+        ).start()
+
     return {"internship_id": internship.internship_id, "message": "Internship created"}
 
 
@@ -1241,14 +1293,36 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(event)
 
-    # Auto-notify target audience
+    notif_title = f"📅 New Event: {payload.title}"
+    notif_body = (f"{payload.date}" if payload.date else "") + \
+                 (f" | {payload.location}" if payload.location else "") or \
+                 (payload.description[:80] if payload.description else "Check it out!")
+
+    # Save to notification DB
     _notify_audience(
         db=db,
         target_role=payload.target_audience,
         sender_id=user.user_id,
         noti_type="event",
-        message=f"📅 New Event: {payload.title}" + (f" on {payload.date}" if payload.date else ""),
+        message=f"{notif_title} — {notif_body}",
     )
+
+    # Send FCM push to target users with tokens
+    import threading
+    query = db.query(models.User).filter(models.User.fcm_token.isnot(None))
+    if payload.target_audience != "all":
+        query = query.filter(models.User.role == payload.target_audience)
+    else:
+        query = query.filter(models.User.role.in_(["student", "alumni"]))
+
+    for target in query.all():
+        if target.user_id == user.user_id:
+            continue
+        threading.Thread(
+            target=_send_fcm_push,
+            args=(target.fcm_token, notif_title, notif_body),
+            daemon=True,
+        ).start()
 
     return {"event_id": event.event_id, "message": "Event created"}
 
@@ -1535,7 +1609,12 @@ def _send_fcm_push(token: str, title: str, body: str, memo_id: str = ""):
         sa_path = os.path.join(os.path.dirname(__file__), "firebase-service-account.json")
 
         if sa_json_str:
-            sa_data = json.loads(sa_json_str)
+            try:
+                sa_data = json.loads(sa_json_str.strip())
+            except json.JSONDecodeError as e:
+                print(f"[FCM] Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+                print(f"[FCM] First 100 chars: {sa_json_str[:100]!r}")
+                return
         elif os.path.exists(sa_path):
             with open(sa_path) as f:
                 sa_data = json.load(f)
@@ -1588,14 +1667,27 @@ def _send_fcm_push(token: str, title: str, body: str, memo_id: str = ""):
 
 @app.get("/conversations", tags=["messages"])
 def list_conversations(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Get all messages where user is either sender or receiver
     sender_ids = [m.receiver_id for m in db.query(models.Message).filter(models.Message.sender_id == current_user.user_id).all()]
     receiver_ids = [m.sender_id for m in db.query(models.Message).filter(models.Message.receiver_id == current_user.user_id).all()]
-    
+
     unique_ids = list(set(sender_ids + receiver_ids))
     other_users = db.query(models.User).filter(models.User.user_id.in_(unique_ids)).all()
-    
-    return [serialize_user(u) for u in other_users]
+
+    result = []
+    for u in other_users:
+        user_data = serialize_user(u)
+        # Count unread messages from this user to current user
+        unread = db.query(models.Message).filter(
+            models.Message.sender_id == u.user_id,
+            models.Message.receiver_id == current_user.user_id,
+            models.Message.is_read == False,
+        ).count()
+        user_data["unread_count"] = unread
+        result.append(user_data)
+
+    # Sort: conversations with unread messages first
+    result.sort(key=lambda x: x["unread_count"], reverse=True)
+    return result
 
 
 @app.patch("/messages/{message_id}", tags=["messages"])
@@ -1745,15 +1837,36 @@ def create_resource(payload: ResourceCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(resource)
 
-    # Auto-notify target audience
-    type_label = "📄 Document" if payload.resource_type == "document" else "🔗 Link"
+    # Build notification content
+    type_label = "📄 New Document" if payload.resource_type == "document" else "🔗 New Link"
+    notif_title = f"{type_label}: {payload.title}"
+    notif_body = payload.description or f"Shared by {user.full_name}"
+
+    # Save to notification DB for all target users
     _notify_audience(
         db=db,
         target_role=payload.target_audience,
         sender_id=user.user_id,
         noti_type="broadcast",
-        message=f"{type_label} shared: {payload.title}",
+        message=f"{notif_title} — {notif_body}",
     )
+
+    # Send FCM push to target users who have a token
+    import threading
+    query = db.query(models.User).filter(models.User.fcm_token.isnot(None))
+    if payload.target_audience != "all":
+        query = query.filter(models.User.role == payload.target_audience)
+    else:
+        query = query.filter(models.User.role.in_(["student", "alumni"]))
+
+    for target_user in query.all():
+        if target_user.user_id == user.user_id:
+            continue
+        threading.Thread(
+            target=_send_fcm_push,
+            args=(target_user.fcm_token, notif_title, notif_body),
+            daemon=True,
+        ).start()
 
     return {"resource_id": resource.resource_id, "message": "Resource created"}
 

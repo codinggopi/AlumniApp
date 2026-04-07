@@ -45,6 +45,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           _isMessagingLocked = false;
           _lockReason = null;
         });
+        // Mark messages from the other user as read
+        _apiService.patch(
+          '/messages/mark-read?sender_id=${widget.otherUser.userId}',
+          {},
+        );
       } else if (response.statusCode == 403) {
         final detail = jsonDecode(response.body)['detail'] as String?;
         setState(() {

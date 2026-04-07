@@ -100,13 +100,28 @@ class _InboxScreenState extends State<InboxScreen> {
                   ),
                   title: Text(
                     otherUser.fullName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontWeight: otherUser.unreadCount > 0
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
                   ),
                   subtitle: Text(
                     otherUser.role.toUpperCase(),
                     style: TextStyle(color: Colors.blue[700], fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: otherUser.unreadCount > 0
+                      ? Badge(
+                          label: Text(
+                            otherUser.unreadCount > 99
+                                ? '99+'
+                                : '${otherUser.unreadCount}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          backgroundColor: Colors.blue,
+                          child: const SizedBox.shrink(),
+                        )
+                      : const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.push(
                       context,

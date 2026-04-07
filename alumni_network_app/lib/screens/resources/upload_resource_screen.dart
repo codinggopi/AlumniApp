@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/api_service.dart';
+import '../../services/permission_service.dart';
 import '../../providers/auth_provider.dart';
 
 // Represents one resource entry to be submitted
@@ -55,6 +56,8 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
   }
 
   Future<void> _pickDocument(int index) async {
+    final granted = await PermissionService.checkMediaPermission(context);
+    if (!granted) return;
     final result = await FilePicker.platform.pickFiles(type: FileType.any);
     if (result != null) {
       setState(() {

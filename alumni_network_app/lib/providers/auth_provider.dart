@@ -35,7 +35,8 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await _apiService.saveToken(data['access_token']);
-        _user = User.fromJson(data);
+        // Fetch full profile (includes profile_picture_url and all fields)
+        await checkAuth();
         _isLoading = false;
         notifyListeners();
         return true;

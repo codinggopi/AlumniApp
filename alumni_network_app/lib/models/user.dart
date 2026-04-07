@@ -26,6 +26,9 @@ class User {
   final bool? mentorshipAvailable;
   final String? experienceSummary;
 
+  // Inbox unread count (only populated in conversations list)
+  final int unreadCount;
+
   User({
     required this.userId,
     required this.email,
@@ -49,6 +52,7 @@ class User {
     this.jobTitle,
     this.mentorshipAvailable,
     this.experienceSummary,
+    this.unreadCount = 0,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -75,6 +79,7 @@ class User {
       jobTitle: json['job_title'],
       mentorshipAvailable: json['mentorship_available'],
       experienceSummary: json['experience_summary'],
+      unreadCount: json['unread_count'] ?? 0,
     );
   }
 
