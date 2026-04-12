@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _selectedRole;
   bool _obscurePassword = true;
 
-    void _handleLogin() async {
+  void _handleLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Show loading dialog for 3 seconds
+    // Show loading dialog — stays open until login completes
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -36,18 +36,19 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             CircularProgressIndicator(color: Color.fromARGB(255, 7, 178, 225)),
             SizedBox(height: 20),
-            Text('Logging in...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
+            Text(
+              'Logging in...',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This may take a moment on first load',
+              style: TextStyle(color: Colors.white60, fontSize: 12, decoration: TextDecoration.none),
+            ),
           ],
         ),
       ),
     );
-
-    // Artificial wait
-    await Future.delayed(const Duration(seconds: 3));
-
-    if (mounted) {
-      Navigator.of(context, rootNavigator: true).pop(); // Close dialog
-    }
 
     final success = await auth.login(
       _emailController.text,
@@ -55,9 +56,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _selectedRole!,
     );
 
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop(); // Close dialog
+    }
+
     if (mounted && !success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Please check credentials.')),
+        const SnackBar(content: Text('Login failed. Please check credentials or try again.')),
       );
     }
   }

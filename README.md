@@ -28,7 +28,7 @@ A comprehensive platform connecting students with alumni for mentorship, career 
 For detailed instructions on each component, refer to their respective README files:
 - [Backend Setup](./backend/README.md)
 - [Flutter App Setup](./alumni_network_app/README.md)
-- api for backend :   //static const String baseUrl = 'https://alumniapp-qths.onrender.com' and 'https://callum-unstigmatic-yappingly.ngrok-free.dev';
+- api for backend : static const String baseUrl = 'https://alumniapp-qths.onrender.com' and 'https://callum-unstigmatic-yappingly.ngrok-free.dev'; and 'https://alumni-app-virid.vercel.app';
 
 ### Render Note
 If backend is deployed on Render, use PostgreSQL via `DATABASE_URL`.  

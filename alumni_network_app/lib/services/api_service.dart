@@ -19,23 +19,23 @@ class ApiService {
     _cachedToken = _prefs?.getString(_tokenKey);
   }
 
-  // 🔥 MODIFIED (use cache)
   Future<String?> getToken() async {
     if (_cachedToken != null) return _cachedToken;
+    _prefs ??= await SharedPreferences.getInstance();
     _cachedToken = _prefs?.getString(_tokenKey);
     return _cachedToken;
   }
 
-  // 🔥 MODIFIED
   Future<void> saveToken(String token) async {
     _cachedToken = token;
-    await _prefs?.setString(_tokenKey, token);
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.setString(_tokenKey, token);
   }
 
-  // 🔥 MODIFIED
   Future<void> deleteToken() async {
     _cachedToken = null;
-    await _prefs?.remove(_tokenKey);
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs!.remove(_tokenKey);
   }
 
   Map<String, String> _headers(String? token) {
@@ -49,25 +49,33 @@ class ApiService {
 
   Future<http.Response> get(String endpoint) async {
     final token = await getToken();
-    return http
-        .get(Uri.parse('$baseUrl$endpoint'), headers: _headers(token))
-        .timeout(const Duration(seconds: 10));
+    final request = http.get(Uri.parse('$baseUrl$endpoint'), headers: _headers(token));
+    // No timeout for auth/me — called right after login
+    if (endpoint.contains('auth/me') || endpoint.contains('auth')) {
+      return request;
+    }
+    return request.timeout(const Duration(seconds: 20));
   }
 
   Future<http.Response> post(String endpoint, dynamic body) async {
     final token = await getToken();
-    final timeout =
-        (endpoint.contains('otp') || endpoint.contains('email-change'))
-            ? const Duration(seconds: 30)
-            : const Duration(seconds: 10);
 
-    return http
-        .post(
-          Uri.parse('$baseUrl$endpoint'),
-          headers: _headers(token),
-          body: jsonEncode(body),
-        )
-        .timeout(timeout);
+    final request = http.post(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _headers(token),
+      body: jsonEncode(body),
+    );
+
+    // No timeout for auth/login — server may be cold starting
+    if (endpoint.contains('login') || endpoint.contains('auth')) {
+      return request;
+    }
+
+    final timeout = (endpoint.contains('otp') || endpoint.contains('email-change'))
+        ? const Duration(seconds: 30)
+        : const Duration(seconds: 15);
+
+    return request.timeout(timeout);
   }
 
   Future<http.Response> delete(String endpoint) async {
