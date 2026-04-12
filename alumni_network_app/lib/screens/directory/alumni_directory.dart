@@ -58,7 +58,20 @@ class _AlumniDirectoryScreenState extends State<AlumniDirectoryScreen> {
                   itemBuilder: (context, index) {
                     final alumni = _alumniList[index];
                     return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      leading: CircleAvatar(
+                        backgroundImage: (alumni.profilePictureUrl != null &&
+                                alumni.profilePictureUrl!.isNotEmpty)
+                            ? NetworkImage(
+                                alumni.profilePictureUrl!.startsWith('http')
+                                    ? alumni.profilePictureUrl!
+                                    : '${ApiService.baseUrl}${alumni.profilePictureUrl}',
+                              )
+                            : null,
+                        child: (alumni.profilePictureUrl == null ||
+                                alumni.profilePictureUrl!.isEmpty)
+                            ? const Icon(Icons.person)
+                            : null,
+                      ),
                       title: Text(alumni.fullName),
                       subtitle: Text('${alumni.department ?? "N/A"} | ${alumni.city ?? "N/A"}'),
                       trailing: const Icon(Icons.chevron_right),

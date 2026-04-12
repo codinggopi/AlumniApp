@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/user.dart';
 import '../chat/chat_room_screen.dart';
 import 'package:provider/provider.dart';
@@ -250,7 +251,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             if (widget.user.role == 'student') ...[
               _buildInfoRow(context, Icons.history_edu, 'Educational Details', widget.user.educationalDetails ?? 'Not Provided'),
               if (widget.user.resumeUrl != null && widget.user.resumeUrl!.isNotEmpty)
-                _buildInfoRow(context, Icons.description, 'Resume / CV', 'Available (Tap to View)'),
+                _buildResumeRow(context, widget.user.resumeUrl!),
             ],
             if (widget.user.role == 'alumni') ...[
               _buildInfoRow(context, Icons.work, 'Current Position', widget.user.jobTitle ?? 'Not Specified'),
@@ -384,6 +385,47 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
               textAlign: TextAlign.center,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResumeRow(BuildContext context, String url) {
+    final fullUrl = url.startsWith('http') ? url : '${ApiService.baseUrl}$url';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.description, color: Colors.blue[300], size: 24),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Resume / CV', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                const SizedBox(height: 3),
+                const Text('Available', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(fullUrl);
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open resume')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('View'),
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
           ),
         ],
       ),

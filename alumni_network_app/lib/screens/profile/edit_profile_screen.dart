@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/permission_service.dart';
@@ -341,7 +342,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (user?.interests != null && user!.interests!.isNotEmpty)
             _viewRow(Icons.star_outline, 'Interests / Skills', user.interests!),
           if (user?.resumeUrl != null && user!.resumeUrl!.isNotEmpty)
-            _viewRow(Icons.description, 'Resume', 'Uploaded'),
+            _viewResumeRow(user.resumeUrl!),
         ],
         if (isAlumni) ...[
           if (user?.currentStatus != null && user!.currentStatus!.isNotEmpty)
@@ -370,8 +371,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool isAdmin(String role) => role == 'admin';
 
-  Widget _viewRow(IconData icon, String label, String value) {
+  Widget _viewResumeRow(String url) {
+    final fullUrl = url.startsWith('http') ? url : '${ApiService.baseUrl}$url';
     return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.description, color: Colors.blue[300], size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Resume / CV', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                const SizedBox(height: 2),
+                const Text('Uploaded', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => _launchUrl(fullUrl),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('View'),
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open resume')),
+        );
+      }
+    }
+  }
+
+  Widget _viewRow(IconData icon, String label, String value) {    return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,18 +642,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: Text('Resume / CV', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.description, color: Colors.blue),
-            title: Text(_localResumePath != null
-                ? 'New File Selected'
-                : (_resumeUrl != null ? 'Resume Uploaded' : 'No Resume')),
-            subtitle: Text(_localResumePath ??
-                (_resumeUrl ?? 'Upload PDF/DOCX'),
-                overflow: TextOverflow.ellipsis),
-            trailing: IconButton(
-              icon: const Icon(Icons.upload_file, color: Colors.blue),
-              onPressed: _pickResume,
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.description, color: Colors.blue),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _localResumePath != null
+                            ? 'New File Selected'
+                            : (_resumeUrl != null ? 'Resume Uploaded' : 'No Resume'),
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      Text(
+                        _localResumePath != null
+                            ? _localResumePath!.split('/').last.split('\\').last
+                            : (_resumeUrl != null ? 'Tap View to open' : 'PDF / DOC / DOCX'),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                // View button — only if resume already uploaded
+                if (_resumeUrl != null && _localResumePath == null)
+                  TextButton.icon(
+                    onPressed: () {
+                      final fullUrl = _resumeUrl!.startsWith('http')
+                          ? _resumeUrl!
+                          : '${ApiService.baseUrl}$_resumeUrl';
+                      _launchUrl(fullUrl);
+                    },
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('View'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                  ),
+                // Upload button
+                IconButton(
+                  icon: const Icon(Icons.upload_file, color: Colors.blue),
+                  tooltip: 'Upload Resume',
+                  onPressed: _pickResume,
+                ),
+              ],
             ),
           ),
         ],
