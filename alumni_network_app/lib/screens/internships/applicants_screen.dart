@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../models/internship.dart';
 
@@ -250,6 +251,9 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
                               Icons.build_outlined,
                               'Skills: ${student['skills']}',
                             ),
+                          if (student?['resume_url'] != null &&
+                              student!['resume_url'].toString().isNotEmpty)
+                            _resumeRow(student['resume_url']),
                           if (app['cover_note'] != null &&
                               app['cover_note'].toString().isNotEmpty) ...[
                             const Divider(height: 20),
@@ -283,6 +287,43 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
                 },
               ),
             ),
+    );
+  }
+
+  Widget _resumeRow(String url) {
+    final fullUrl = url.startsWith('http') ? url : '${ApiService.baseUrl}$url';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, top: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.description, size: 14, color: Colors.blue),
+          const SizedBox(width: 6),
+          const Text('Resume / CV', style: TextStyle(fontSize: 13)),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(fullUrl);
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open resume')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text('View', style: TextStyle(fontSize: 13)),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
