@@ -604,6 +604,19 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
         QuickAction(
+          id: 'admins',
+          icon: Icons.admin_panel_settings,
+          title: 'All Admins',
+          color: Colors.deepOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const UserListScreen(role: 'admin', title: 'All Admins'),
+            ),
+          ),
+        ),
+        QuickAction(
           id: 'send_notification',
           icon: Icons.campaign,
           title: 'Send Notification',

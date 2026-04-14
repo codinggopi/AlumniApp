@@ -455,7 +455,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           border: OutlineInputBorder(),
                         ),
                         hint: const Text('Select Role'),
-                        items: ['student', 'alumni', 'staff']
+                        items: ['student', 'alumni', 'staff', 'admin']
                             .map(
                               (role) => DropdownMenuItem(
                                 value: role,

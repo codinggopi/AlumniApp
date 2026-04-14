@@ -26,7 +26,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Show loading dialog — stays open until login completes
+    // Capture navigator before async gap
+    final navigator = Navigator.of(context, rootNavigator: true);
+    bool dialogOpen = true;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -48,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
-    );
+    ).then((_) => dialogOpen = false);
 
     final success = await auth.login(
       _emailController.text,
@@ -56,8 +59,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _selectedRole!,
     );
 
-    if (mounted) {
-      Navigator.of(context, rootNavigator: true).pop(); // Close dialog
+    // Close dialog if still open
+    if (dialogOpen) {
+      try {
+        navigator.pop();
+      } catch (_) {}
     }
 
     if (mounted && !success) {
