@@ -15,7 +15,6 @@ import 'screens/auth/login_screen.dart';
 import 'screens/internships/internship_list.dart';
 import 'screens/events/events_list_screen.dart';
 import 'screens/chat/inbox_screen.dart';
-import 'screens/dashboard/customize_dashboard_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/admin/user_list_screen.dart';
@@ -53,9 +52,66 @@ class MyApp extends StatelessWidget {
       title: 'Alumni Network',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         useMaterial3: true,
         fontFamily: 'Inter',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF1A1A2E),
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1A1A2E),
+          ),
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: EdgeInsets.zero,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1565C0),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFF5F7FA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: Color(0xFF1565C0),
+          unselectedItemColor: Color(0xFF9E9E9E),
+          elevation: 8,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+          unselectedLabelStyle: TextStyle(fontSize: 11),
+        ),
       ),
       home: const AuthWrapper(),
     );
@@ -142,40 +198,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          setState(() => _selectedIndex = index);
-          // Clear badge when Messages tab is tapped
-          if (index == 3) {
-            Provider.of<MessageCountProvider>(context, listen: false).reset();
-          }
-        },
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Home',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.work),
-            label: 'Internships',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.event),
-            label: 'Events',
-          ),
-          BottomNavigationBarItem(
-            label: 'Messages',
-            icon: Badge(
-              isLabelVisible: unread > 0,
-              label: Text(unread > 99 ? '99+' : '$unread'),
-              child: const Icon(Icons.chat),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: const Color(0xFF1565C0),
+          unselectedItemColor: const Color(0xFF9E9E9E),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          onTap: (index) {
+            setState(() => _selectedIndex = index);
+            if (index == 3) {
+              Provider.of<MessageCountProvider>(context, listen: false).reset();
+            }
+          },
+          items: [
+            const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
+            const BottomNavigationBarItem(icon: Icon(Icons.work_outline), activeIcon: Icon(Icons.work), label: 'Internships'),
+            const BottomNavigationBarItem(icon: Icon(Icons.event_outlined), activeIcon: Icon(Icons.event), label: 'Events'),
+            BottomNavigationBarItem(
+              label: 'Messages',
+              icon: Badge(isLabelVisible: unread > 0, label: Text(unread > 99 ? '99+' : '$unread'), child: const Icon(Icons.chat_bubble_outline)),
+              activeIcon: Badge(isLabelVisible: unread > 0, label: Text(unread > 99 ? '99+' : '$unread'), child: const Icon(Icons.chat_bubble)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -324,19 +383,60 @@ class _DashboardViewState extends State<DashboardView> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF5F7FA),
+      drawer: _buildSideDrawer(context, user, role, availableActions, auth),
       appBar: AppBar(
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Good ${_greeting()},',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w400),
+            ),
+            Text(
+              (user?.fullName ?? 'Welcome').split(' ').first,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E)),
+            ),
+          ],
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
           _NotificationBell(),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () => _handleLogout(context, auth),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => _pickImage(auth),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFFE3F2FD),
+                backgroundImage: (user?.profilePictureUrl != null && user!.profilePictureUrl!.isNotEmpty)
+                    ? NetworkImage(user.profilePictureUrl!.startsWith('http')
+                        ? user.profilePictureUrl!
+                        : '${ApiService.baseUrl}${user.profilePictureUrl}')
+                    : null,
+                child: (user?.profilePictureUrl == null || user!.profilePictureUrl!.isEmpty)
+                    ? const Icon(Icons.person, size: 20, color: Color(0xFF1565C0))
+                    : (_isUploading ? const CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1565C0)) : null),
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFF1A1A2E)),
+            onSelected: (val) {
+              if (val == 'logout') _handleLogout(context, auth);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(children: [
+                  Icon(Icons.logout, color: Colors.red, size: 18),
+                  SizedBox(width: 10),
+                  Text('Logout', style: TextStyle(color: Colors.red)),
+                ]),
+              ),
+            ],
           ),
         ],
       ),
@@ -347,105 +447,88 @@ class _DashboardViewState extends State<DashboardView> {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Profile summary card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Colors.blue, Colors.indigo],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1565C0), Color(0xFF283593)],
                   ),
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1565C0).withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              role.toUpperCase(),
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            user?.fullName ?? 'User',
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            role == 'alumni'
+                                ? '${user?.jobTitle ?? "Professional"} @ ${user?.company ?? "Member"}'
+                                : role == 'student'
+                                ? (user?.currentStatus ?? 'Active Student')
+                                : user?.email ?? '',
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
                     GestureDetector(
                       onTap: () => _pickImage(auth),
                       child: Stack(
                         children: [
                           CircleAvatar(
-                            radius: 35,
+                            radius: 36,
                             backgroundColor: Colors.white24,
-                            backgroundImage:
-                                (user?.profilePictureUrl != null &&
-                                    user!.profilePictureUrl!.isNotEmpty)
-                                ? NetworkImage(
-                                    user.profilePictureUrl!.startsWith('http')
-                                        ? user.profilePictureUrl!
-                                        : '${ApiService.baseUrl}${user.profilePictureUrl}',
-                                  )
+                            backgroundImage: (user?.profilePictureUrl != null && user!.profilePictureUrl!.isNotEmpty)
+                                ? NetworkImage(user.profilePictureUrl!.startsWith('http')
+                                    ? user.profilePictureUrl!
+                                    : '${ApiService.baseUrl}${user.profilePictureUrl}')
                                 : null,
-                            child:
-                                (user?.profilePictureUrl == null ||
-                                    user!.profilePictureUrl!.isEmpty)
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 40,
-                                    color: Colors.white,
-                                  )
-                                : (_isUploading
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.white,
-                                        )
-                                      : null),
+                            child: (user?.profilePictureUrl == null || user!.profilePictureUrl!.isEmpty)
+                                ? const Icon(Icons.person, size: 36, color: Colors.white)
+                                : (_isUploading ? const CircularProgressIndicator(color: Colors.white) : null),
                           ),
                           Positioned(
-                            bottom: 0,
-                            right: 0,
+                            bottom: 0, right: 0,
                             child: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.blue,
-                                size: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hi, ${user?.fullName ?? "User"}!',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          if (role != 'admin' && role != 'staff' ||
-                              (user?.currentStatus != null &&
-                                  user!.currentStatus!.isNotEmpty))
-                            Text(
-                              role == 'alumni'
-                                  ? '${user?.jobTitle ?? "Professional"} @ ${user?.company ?? "Member"}'
-                                  : (user?.currentStatus ?? 'Active Student'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          const SizedBox(height: 2),
-                          Text(
-                            role.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
+                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: const Icon(Icons.camera_alt, color: Color(0xFF1565C0), size: 12),
                             ),
                           ),
                         ],
@@ -454,61 +537,12 @@ class _DashboardViewState extends State<DashboardView> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Quick Actions',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  if (user != null)
-                    TextButton.icon(
-                      onPressed: () async {
-                        final updated = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CustomizeDashboardScreen(
-                              storageKey: '${role}_quick_actions_order',
-                              currentOrder: availableActions
-                                  .map((e) => e.id)
-                                  .toList(),
-                              availableIds: availableActions
-                                  .map((e) => e.id)
-                                  .toList(),
-                            ),
-                          ),
-                        );
-                        if (updated == true) _loadCustomOrder();
-                      },
-                      icon: const Icon(Icons.settings, size: 18),
-                      label: const Text('Customize'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 15),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: availableActions.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 15,
-                  childAspectRatio: 1.1,
-                ),
-                itemBuilder: (context, index) {
-                  final action = availableActions[index];
-                  return _buildActionCard(
-                    context,
-                    action.icon,
-                    action.title,
-                    action.color,
-                    action.onTap,
-                    index,
-                  );
-                },
-              ),
+              const SizedBox(height: 24),
+              // Admin stats or welcome message
+              if (role == 'admin' || role == 'staff')
+                _AdminStatsWidget()
+              else
+                _WelcomeTip(role: role),
             ],
           ),
         ),
@@ -720,33 +754,22 @@ class _DashboardViewState extends State<DashboardView> {
     return actions;
   }
 
-  Widget _buildActionCard(
-    BuildContext context,
-    IconData icon,
-    String title,
-    Color color,
-    VoidCallback onTap,
-    int index,
-  ) {
-    return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 300 + (index * 100)),
-      tween: Tween(begin: 0.0, end: 1.0),
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 30 * (1 - value)),
-            child: child,
-          ),
-        );
-      },
-      child: _AnimatedActionCard(
-        icon: icon,
-        title: title,
-        color: color,
-        onTap: onTap,
-      ),
+  Widget _buildSideDrawer(BuildContext context, user, String role, List<QuickAction> actions, AuthProvider auth) {
+    return _SideDrawer(
+      user: user,
+      role: role,
+      actions: actions,
+      auth: auth,
+      storageKey: '${role}_quick_actions_order',
+      onOrderChanged: _loadCustomOrder,
+      onLogout: () => _handleLogout(context, auth),
     );
+  }
+
+  String _greeting() {    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Morning';
+    if (hour < 16) return 'Afternoon';
+    return 'Evening';
   }
 }
 
@@ -772,6 +795,466 @@ class _NotificationBell extends StatelessWidget {
   }
 }
 
+class _AdminStatsWidget extends StatefulWidget {
+  @override
+  State<_AdminStatsWidget> createState() => _AdminStatsWidgetState();
+}
+
+class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
+  Map<String, dynamic>? _stats;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final response = await ApiService().get('/admin/stats');
+      if (response.statusCode == 200) {
+        setState(() {
+          _stats = jsonDecode(response.body);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(24),
+        child: CircularProgressIndicator(),
+      ));
+    }
+    if (_stats == null) return const SizedBox.shrink();
+
+    final items = [
+      _StatItem('Students',    _stats!['total_students'],    Icons.school,           const Color(0xFF1565C0)),
+      _StatItem('Alumni',      _stats!['total_alumni'],      Icons.group_work,       const Color(0xFF00897B)),
+      _StatItem('Staff',       _stats!['total_staff'],       Icons.badge,            const Color(0xFF6D4C41)),
+      _StatItem('Admins',      _stats!['total_admins'],      Icons.admin_panel_settings, const Color(0xFFE65100)),
+      _StatItem('Internships', _stats!['total_internships'], Icons.work,             const Color(0xFFF57C00)),
+      _StatItem('Events',      _stats!['total_events'],      Icons.event,            const Color(0xFF7B1FA2)),
+      _StatItem('Resources',   _stats!['total_resources'],   Icons.library_books,    const Color(0xFF0277BD)),
+      _StatItem('Connections', _stats!['total_connections'], Icons.people,           const Color(0xFF2E7D32)),
+      _StatItem('Pending',     _stats!['pending_connections'],Icons.hourglass_empty, const Color(0xFFC62828)),
+      _StatItem('Messages',    _stats!['total_messages'],    Icons.chat_bubble,      const Color(0xFFAD1457)),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('Platform Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
+            const Spacer(),
+            IconButton(
+              icon: _loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh, size: 20, color: Color(0xFF9E9E9E)),
+              onPressed: _loading ? null : _fetchStats,
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.6,
+          ),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: item.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.icon, color: item.color, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${item.value}',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: item.color),
+                        ),
+                        Text(
+                          item.label,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _StatItem {
+  final String label;
+  final dynamic value;
+  final IconData icon;
+  final Color color;
+  const _StatItem(this.label, this.value, this.icon, this.color);
+}
+
+class _WelcomeTip extends StatelessWidget {
+  final String role;
+  const _WelcomeTip({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final tips = {
+      'student': ('Connect with Alumni', 'Browse the alumni directory and send connection requests to get mentorship and internship opportunities.', Icons.school, const Color(0xFF1565C0)),
+      'alumni': ('Share Opportunities', 'Post internships and connect with students to give back to your community.', Icons.group_work, const Color(0xFF00897B)),
+      'staff': ('Manage Resources', 'Upload educational resources and send notifications to keep students informed.', Icons.badge, const Color(0xFF6D4C41)),
+    };
+    final tip = tips[role] ?? tips['student']!;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: tip.$4.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: tip.$4.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: tip.$4.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(tip.$3, color: tip.$4, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tip.$1, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: tip.$4)),
+                const SizedBox(height: 4),
+                Text(tip.$2, style: const TextStyle(fontSize: 12, color: Color(0xFF757575), height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideDrawer extends StatefulWidget {
+  final dynamic user;
+  final String role;
+  final List<QuickAction> actions;
+  final AuthProvider auth;
+  final String storageKey;
+  final VoidCallback onOrderChanged;
+  final VoidCallback onLogout;
+
+  const _SideDrawer({
+    required this.user,
+    required this.role,
+    required this.actions,
+    required this.auth,
+    required this.storageKey,
+    required this.onOrderChanged,
+    required this.onLogout,
+  });
+
+  @override
+  State<_SideDrawer> createState() => _SideDrawerState();
+}
+
+class _SideDrawerState extends State<_SideDrawer> {
+  late List<QuickAction> _actions;
+  bool _isReordering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _actions = List.from(widget.actions);
+  }
+
+  @override
+  void didUpdateWidget(_SideDrawer old) {
+    super.didUpdateWidget(old);
+    if (!_isReordering) _actions = List.from(widget.actions);
+  }
+
+  Future<void> _saveOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(widget.storageKey, _actions.map((a) => a.id).toList());
+    setState(() => _isReordering = false);
+    widget.onOrderChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1565C0), Color(0xFF283593)],
+                ),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.white24,
+                    backgroundImage: (widget.user?.profilePictureUrl != null &&
+                            widget.user!.profilePictureUrl!.isNotEmpty)
+                        ? NetworkImage(widget.user!.profilePictureUrl!.startsWith('http')
+                            ? widget.user!.profilePictureUrl!
+                            : '${ApiService.baseUrl}${widget.user!.profilePictureUrl}')
+                        : null,
+                    child: (widget.user?.profilePictureUrl == null ||
+                            widget.user!.profilePictureUrl!.isEmpty)
+                        ? const Icon(Icons.person, size: 28, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.user?.fullName ?? 'User',
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            widget.role.toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Toolbar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+              child: Row(
+                children: [
+                  const Text('Quick Actions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF9E9E9E), letterSpacing: 0.5)),
+                  const Spacer(),
+                  if (!_isReordering)
+                    GestureDetector(
+                      onTap: () => setState(() => _isReordering = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.tune, size: 13, color: Color(0xFF1565C0)),
+                            SizedBox(width: 4),
+                            Text('Arrange', style: TextStyle(fontSize: 11, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _actions = List.from(widget.actions);
+                            _isReordering = false;
+                          }),
+                          child: const Text('Cancel', style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: _saveOrder,
+                          child: const Text('Save', style: TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            // Actions list
+            Expanded(
+              child: _isReordering
+                  ? ReorderableListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      itemCount: _actions.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          final item = _actions.removeAt(oldIndex);
+                          _actions.insert(newIndex, item);
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final action = _actions[index];
+                        return Container(
+                          key: ValueKey(action.id),
+                          margin: const EdgeInsets.only(bottom: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F7FA),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: action.color.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(action.icon, color: action.color, size: 18),
+                            ),
+                            title: Text(action.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            trailing: Icon(Icons.drag_handle, color: Colors.grey[400]),
+                          ),
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      itemCount: _actions.length,
+                      itemBuilder: (context, index) => _DrawerActionTile(action: _actions[index]),
+                    ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.person_outline, color: Color(0xFF1565C0)),
+              title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500, fontSize: 14)),
+              onTap: () {
+                Navigator.pop(context);
+                widget.onLogout();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerActionTile extends StatefulWidget {
+  final QuickAction action;
+  const _DrawerActionTile({required this.action});
+
+  @override
+  State<_DrawerActionTile> createState() => _DrawerActionTileState();
+}
+
+class _DrawerActionTileState extends State<_DrawerActionTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: _hovered ? widget.action.color.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: widget.action.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(widget.action.icon, color: widget.action.color, size: 20),
+          ),
+          title: Text(
+            widget.action.title,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              color: _hovered ? widget.action.color : const Color(0xFF1A1A2E),
+            ),
+          ),
+          trailing: Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
+          onTap: () {
+            Navigator.pop(context); // close drawer
+            widget.action.onTap();
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _AnimatedActionCard extends StatefulWidget {
   final IconData icon;
   final String title;
@@ -791,52 +1274,67 @@ class _AnimatedActionCard extends StatefulWidget {
 
 class _AnimatedActionCardState extends State<_AnimatedActionCard> {
   double _scale = 1.0;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _scale = 0.92),
-      onTapUp: (_) => setState(() => _scale = 1.0),
-      onTapCancel: () => setState(() => _scale = 1.0),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _scale,
-        duration: const Duration(milliseconds: 100),
-        child: Card(
-          elevation: 4,
-          shadowColor: widget.color.withValues(alpha: 0.3),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _scale = 0.94),
+        onTapUp: (_) => setState(() => _scale = 1.0),
+        onTapCancel: () => setState(() => _scale = 1.0),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 100),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, widget.color.withValues(alpha: 0.05)],
+              color: _hovered ? widget.color.withValues(alpha: 0.06) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _hovered ? widget.color.withValues(alpha: 0.4) : Colors.transparent,
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: _hovered
+                      ? widget.color.withValues(alpha: 0.18)
+                      : Colors.black.withValues(alpha: 0.06),
+                  blurRadius: _hovered ? 16 : 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: widget.color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
+                    color: widget.color.withValues(alpha: _hovered ? 0.2 : 0.12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(widget.icon, size: 32, color: widget.color),
+                  child: Icon(widget.icon, size: 26, color: widget.color),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: Colors.grey[800],
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11.5,
+                      color: _hovered ? widget.color : const Color(0xFF1A1A2E),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),

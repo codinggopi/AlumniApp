@@ -760,6 +760,40 @@ def list_alumni(
     return [serialize_alumni(user, profile) for user, profile in results]
 
 
+@app.get("/admin/stats", tags=["admin"])
+def get_admin_stats(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    total_students  = db.query(models.User).filter(models.User.role == "student").count()
+    total_alumni    = db.query(models.User).filter(models.User.role == "alumni").count()
+    total_staff     = db.query(models.User).filter(models.User.role == "staff").count()
+    total_admins    = db.query(models.User).filter(models.User.role == "admin").count()
+    total_internships = db.query(models.Internship).count()
+    total_events    = db.query(models.Event).count()
+    total_resources = db.query(models.Resource).count()
+    total_connections = db.query(models.Connection).filter(models.Connection.status == "accepted").count()
+    pending_connections = db.query(models.Connection).filter(models.Connection.status == "pending").count()
+    total_messages  = db.query(models.Message).count()
+
+    return {
+        "total_students": total_students,
+        "total_alumni": total_alumni,
+        "total_staff": total_staff,
+        "total_admins": total_admins,
+        "total_internships": total_internships,
+        "total_events": total_events,
+        "total_resources": total_resources,
+        "total_connections": total_connections,
+        "pending_connections": pending_connections,
+        "total_messages": total_messages,
+        "total_users": total_students + total_alumni + total_staff + total_admins,
+    }
+
+
 @app.get("/users", tags=["admin"])
 def list_users(
     role: Optional[str] = None,
