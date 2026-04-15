@@ -257,8 +257,9 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
               _buildInfoRow(context, Icons.work, 'Current Position', widget.user.jobTitle ?? 'Not Specified'),
               _buildInfoRow(context, Icons.business_center, 'Company / Status', widget.user.company ?? 'Internal'),
             ],
-            _buildInfoRow(context, Icons.business, 'Department', widget.user.department ?? 'N/A'),
-            if (widget.user.role != 'staff')
+            if (widget.user.role != 'admin')
+              _buildInfoRow(context, Icons.business, 'Department', widget.user.department ?? 'N/A'),
+            if (widget.user.role != 'staff' && widget.user.role != 'admin')
               _buildInfoRow(context, Icons.calendar_today, 'Graduated Year', widget.user.graduationYear?.toString() ?? 'N/A'),
             _buildInfoRow(context, Icons.location_on, 'City', widget.user.city ?? 'N/A'),
             _buildInfoRow(context, Icons.email, 'Email', widget.user.email),

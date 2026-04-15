@@ -324,7 +324,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _viewRow(Icons.location_on, 'City', user.city!),
         if (!isAdmin(role) && user?.department != null && user!.department!.isNotEmpty)
           _viewRow(Icons.business, 'Department', user.department!),
-        if (user?.graduationYear != null && role != 'staff')
+        if (user?.graduationYear != null && role != 'staff' && role != 'admin')
           _viewRow(Icons.calendar_today, 'Graduation Year', '${user!.graduationYear}'),
 
         // Role-specific

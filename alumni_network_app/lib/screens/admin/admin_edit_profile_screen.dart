@@ -133,8 +133,9 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
                 children: [
                   _field(_nameCtrl, 'Full Name', Icons.person),
                   _field(_phoneCtrl, 'Phone', Icons.phone),
-                  _field(_deptCtrl, 'Department', Icons.business),
-                  if (!isStaff)
+                  if (!isStaff && role != 'admin')
+                    _field(_deptCtrl, 'Department', Icons.business),
+                  if (!isStaff && role != 'admin')
                     _field(_gradYearCtrl, 'Graduation Year', Icons.calendar_today,
                         keyboardType: TextInputType.number),
                   _field(_cityCtrl, 'City', Icons.location_on),

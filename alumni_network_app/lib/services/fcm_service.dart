@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_service.dart';
@@ -65,6 +66,9 @@ class FcmService {
 
   /// ── INIT ─────────────────────────
   static Future<void> initialize() async {
+    // Firebase only works on Android/iOS — skip on web/desktop
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+
     await Firebase.initializeApp();
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -138,6 +142,7 @@ class FcmService {
 
   /// ── PERMISSION ─────────────────────────
   static Future<bool> requestPermission(BuildContext context) async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return false;
     // Request media permissions at the same time
     await PermissionService.requestAllPermissions(context);
 
@@ -185,6 +190,7 @@ class FcmService {
 
   /// ── TOKEN ─────────────────────────
   static Future<void> _generateToken() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
     try {
       _cachedToken = await _messaging.getToken();
       debugPrint('[FCM] Token: $_cachedToken');
