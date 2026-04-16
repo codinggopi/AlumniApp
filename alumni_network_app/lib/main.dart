@@ -251,6 +251,7 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   List<String> _customOrder = [];
   bool _isUploading = false;
+  int _statsRefreshKey = 0; // increment to force stats widget rebuild
 
   @override
   void initState() {
@@ -330,6 +331,29 @@ class _DashboardViewState extends State<DashboardView> {
     }
   }
 
+  void _handleRefresh(BuildContext context, AuthProvider auth) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 20),
+            Text('Refreshing...', style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none)),
+          ],
+        ),
+      ),
+    );
+    await auth.checkAuth();
+    await _loadCustomOrder();
+    if (mounted) {
+      setState(() => _statsRefreshKey++);
+      Navigator.pop(context);
+    }
+  }
+
   void _handleLogout(BuildContext context, AuthProvider auth) {
     showDialog(
       context: context,
@@ -393,10 +417,15 @@ class _DashboardViewState extends State<DashboardView> {
               'Good ${_greeting()},',
               style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w400),
             ),
-            Text(
-              (user?.fullName ?? 'Welcome').split(' ').first,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E)),
-            ),
+            user == null
+                ? const SizedBox(
+                    width: 100, height: 18,
+                    child: LinearProgressIndicator(borderRadius: BorderRadius.all(Radius.circular(4))),
+                  )
+                : Text(
+                    (user.fullName).split(' ').first,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E)),
+                  ),
           ],
         ),
         backgroundColor: Colors.white,
@@ -425,9 +454,18 @@ class _DashboardViewState extends State<DashboardView> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Color(0xFF1A1A2E)),
             onSelected: (val) {
+              if (val == 'refresh') _handleRefresh(context, auth);
               if (val == 'logout') _handleLogout(context, auth);
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(children: [
+                  Icon(Icons.refresh, color: Color(0xFF1565C0), size: 18),
+                  SizedBox(width: 10),
+                  Text('Refresh'),
+                ]),
+              ),
               const PopupMenuItem(
                 value: 'logout',
                 child: Row(children: [
@@ -444,6 +482,7 @@ class _DashboardViewState extends State<DashboardView> {
         onRefresh: () async {
           await auth.checkAuth();
           await _loadCustomOrder();
+          setState(() => _statsRefreshKey++);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -540,7 +579,7 @@ class _DashboardViewState extends State<DashboardView> {
               const SizedBox(height: 24),
               // Admin stats or welcome message
               if (role == 'admin' || role == 'staff')
-                _AdminStatsWidget()
+                _AdminStatsWidget(key: ValueKey(_statsRefreshKey))
               else
                 _WelcomeTip(role: role),
             ],
@@ -796,6 +835,8 @@ class _NotificationBell extends StatelessWidget {
 }
 
 class _AdminStatsWidget extends StatefulWidget {
+  const _AdminStatsWidget({super.key});
+
   @override
   State<_AdminStatsWidget> createState() => _AdminStatsWidgetState();
 }
@@ -827,10 +868,38 @@ class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(24),
-        child: CircularProgressIndicator(),
-      ));
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 6,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.6,
+        ),
+        itemBuilder: (_, __) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12))),
+                const SizedBox(width: 12),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(height: 20, width: 50, color: Colors.grey[200]),
+                    const SizedBox(height: 6),
+                    Container(height: 12, width: 70, color: Colors.grey[100]),
+                  ],
+                )),
+              ],
+            ),
+          ),
+        ),
+      );
     }
     if (_stats == null) return const SizedBox.shrink();
 

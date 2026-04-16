@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import 'forgot_password_screen.dart';
-
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +16,40 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   String? _selectedRole;
   bool _obscurePassword = true;
+  bool _rememberMe = true;
+
+  static const _keyEmail = 'last_login_email';
+  static const _keyRole  = 'last_login_role';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastLogin();
+  }
+
+  Future<void> _loadLastLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_keyEmail);
+    final role  = prefs.getString(_keyRole);
+    if (email != null && role != null && mounted) {
+      setState(() {
+        _emailController.text = email;
+        _selectedRole = role;
+      });
+    }
+  }
+
+  Future<void> _saveLastLogin(String email, String role) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyEmail, email);
+    await prefs.setString(_keyRole, role);
+  }
+
+  Future<void> _clearLastLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyEmail);
+    await prefs.remove(_keyRole);
+  }
 
   void _handleLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -26,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Capture navigator before async gap
     final navigator = Navigator.of(context, rootNavigator: true);
     bool dialogOpen = true;
 
@@ -39,15 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             CircularProgressIndicator(color: Color.fromARGB(255, 7, 178, 225)),
             SizedBox(height: 20),
-            Text(
-              'Logging in...',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none),
-            ),
+            Text('Logging in...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, decoration: TextDecoration.none)),
             SizedBox(height: 8),
-            Text(
-              'This may take a moment on first load',
-              style: TextStyle(color: Colors.white60, fontSize: 12, decoration: TextDecoration.none),
-            ),
+            Text('This may take a moment on first load...', style: TextStyle(color: Colors.white60, fontSize: 12, decoration: TextDecoration.none)),
           ],
         ),
       ),
@@ -59,18 +86,29 @@ class _LoginScreenState extends State<LoginScreen> {
       _selectedRole!,
     );
 
-    // Close dialog if still open
     if (dialogOpen) {
-      try {
-        navigator.pop();
-      } catch (_) {}
+      try { navigator.pop(); } catch (_) {}
     }
 
-    if (mounted && !success) {
+    if (success) {
+      // Save last login so next time the fields are pre-filled
+      if (_rememberMe) {
+        await _saveLastLogin(_emailController.text.trim(), _selectedRole!);
+      } else {
+        await _clearLastLogin();
+      }
+    } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login failed. Please check credentials or try again.')),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -98,13 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Icon(Icons.school, size: 60, color: Colors.blue),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Welcome Back',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
+                      const Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 30),
                       TextField(
                         controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
                           labelText: 'Email',
                           prefixIcon: Icon(Icons.email),
@@ -138,15 +174,27 @@ class _LoginScreenState extends State<LoginScreen> {
                             .toList(),
                         onChanged: (value) => setState(() => _selectedRole = value),
                       ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
-                          },
-                          child: const Text('Forgot Password?'),
-                        ),
+                      const SizedBox(height: 8),
+                      // Remember me toggle
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: _rememberMe,
+                              onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                              activeColor: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Remember me', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
+                            child: const Text('Forgot Password?'),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
@@ -163,15 +211,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        "Accounts are created by the Administrator.",
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
+                      const Text("Accounts are created by the Administrator.", style: TextStyle(color: Colors.grey, fontSize: 13)),
                       const SizedBox(height: 5),
-                      const Text(
-                        "Please contact your college admin for access.",
-                        style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold),
-                      ),
+                      const Text("Please contact your college admin for access.", style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
