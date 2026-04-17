@@ -141,10 +141,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
+                        onChanged: (value) => setState(() {}),
+                        decoration: InputDecoration(
                           labelText: 'Email',
-                          prefixIcon: Icon(Icons.email),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.email),
+                          suffixIcon: _emailController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 20),
+                                  onPressed: () {
+                                    _emailController.clear();
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 15),
@@ -155,7 +165,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'Password',
                           prefixIcon: const Icon(Icons.lock),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              size: 20,
+                            ),
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
                           border: const OutlineInputBorder(),

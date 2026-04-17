@@ -252,6 +252,7 @@ class _DashboardViewState extends State<DashboardView> {
   List<String> _customOrder = [];
   bool _isUploading = false;
   int _statsRefreshKey = 0; // increment to force stats widget rebuild
+  int? _loadedUserId;
 
   @override
   void initState() {
@@ -261,15 +262,28 @@ class _DashboardViewState extends State<DashboardView> {
 
   Future<void> _loadCustomOrder() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       final auth = Provider.of<AuthProvider>(context, listen: false);
-      final role = (auth.user?.role ?? 'student').toLowerCase();
-      final order = prefs.getStringList('${role}_quick_actions_order');
+      final user = auth.user;
+      if (user == null) return;
+      
+      _loadedUserId = user.userId;
+      final role = user.role.toLowerCase();
+      
+      final prefs = await SharedPreferences.getInstance();
+      // Use user-specific key for persistence
+      final order = prefs.getStringList('user_${user.userId}_quick_actions_order');
+      
       if (order != null && mounted) {
         setState(() {
           _customOrder = order;
         });
+      } else if (mounted) {
+        // Fallback to role-based if user-specific not found (for migration)
+        final oldOrder = prefs.getStringList('${role}_quick_actions_order');
+        if (oldOrder != null) {
+          setState(() => _customOrder = oldOrder);
+        }
       }
     } catch (e) {
       debugPrint('Load custom order error: $e');
@@ -389,6 +403,12 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.user;
+    
+    // Safety check: if user changed but order wasn't reloaded, reload it
+    if (user != null && user.userId != _loadedUserId) {
+      Future.microtask(() => _loadCustomOrder());
+    }
+
     final role = (user?.role ?? 'student').toLowerCase();
 
     List<QuickAction> availableActions = _getActionsForUser(role);
@@ -799,7 +819,7 @@ class _DashboardViewState extends State<DashboardView> {
       role: role,
       actions: actions,
       auth: auth,
-      storageKey: '${role}_quick_actions_order',
+      storageKey: 'user_${user?.userId}_quick_actions_order',
       onOrderChanged: _loadCustomOrder,
       onLogout: () => _handleLogout(context, auth),
     );
