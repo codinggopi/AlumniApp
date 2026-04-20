@@ -24,6 +24,7 @@ import 'screens/auth/splash_screen.dart' as animated;
 import 'screens/resources/resource_list_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/notifications/send_notification_screen.dart';
+import 'screens/dashboard/student_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -600,6 +601,8 @@ class _DashboardViewState extends State<DashboardView> {
               // Admin stats or welcome message
               if (role == 'admin' || role == 'staff')
                 _AdminStatsWidget(key: ValueKey(_statsRefreshKey))
+              else if (role == 'student')
+                StudentDashboard(key: ValueKey(_statsRefreshKey), onTabChange: widget.onTabChange)
               else
                 _WelcomeTip(role: role),
             ],

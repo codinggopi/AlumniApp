@@ -760,6 +760,103 @@ def list_alumni(
     return [serialize_alumni(user, profile) for user, profile in results]
 
 
+@app.get("/student/dashboard", tags=["profile"])
+def get_student_dashboard(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
+
+    uid = current_user.user_id
+
+    # Accepted connections count
+    from sqlalchemy import or_
+    connections = db.query(models.Connection).filter(
+        models.Connection.status == "accepted",
+        or_(
+            models.Connection.requester_id == uid,
+            models.Connection.receiver_id == uid,
+        )
+    ).count()
+
+    # Unread messages
+    unread_msgs = db.query(models.Message).filter(
+        models.Message.receiver_id == uid,
+        models.Message.is_read == False,
+    ).count()
+
+    # Applications sent
+    apps_sent = db.query(models.Application).filter(
+        models.Application.student_id == uid
+    ).count()
+
+    print(f"[Dashboard] uid={uid} connections={connections} unread={unread_msgs} apps={apps_sent}")
+
+    # Latest 3 events (notice board)
+    events = db.query(models.Event).filter(
+        (models.Event.target_audience == "all") | (models.Event.target_audience == "student")
+    ).order_by(models.Event.created_at.desc()).limit(5).all()
+
+    # Featured internship (latest open)
+    featured = db.query(models.Internship).filter(
+        models.Internship.status == "Open"
+    ).order_by(models.Internship.created_at.desc()).first()
+
+    # Recent activity from notifications
+    recent = db.query(models.Notification).filter(
+        models.Notification.user_id == uid
+    ).order_by(models.Notification.created_at.desc()).limit(5).all()
+
+    # Find a mentor — alumni with mentorship available
+    mentors = db.query(models.User, models.AlumniProfile).join(
+        models.AlumniProfile, models.AlumniProfile.alumni_id == models.User.user_id
+    ).filter(
+        models.AlumniProfile.mentorship_available == True
+    ).limit(3).all()
+
+    return {
+        "stats": {
+            "connections": connections,
+            "unread_messages": unread_msgs,
+            "applications_sent": apps_sent,
+        },
+        "notices": [
+            {
+                "event_id": e.event_id,
+                "title": e.title,
+                "date": e.date,
+                "description": (e.description or "")[:120],
+                "category": e.category,
+            } for e in events
+        ],
+        "featured_internship": {
+            "internship_id": featured.internship_id,
+            "role_title": featured.role_title,
+            "company": featured.company,
+            "deadline": featured.deadline,
+            "location": featured.location,
+        } if featured else None,
+        "recent_activity": [
+            {
+                "message": r.message,
+                "type": r.type,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "is_read": r.is_read,
+            } for r in recent
+        ],
+        "mentors": [
+            {
+                "user_id": u.user_id,
+                "full_name": u.full_name,
+                "job_title": p.job_title,
+                "company": p.company,
+                "profile_picture_url": u.profile_picture_url,
+            } for u, p in mentors
+        ],
+    }
+
+
 @app.get("/admin/stats", tags=["admin"])
 def get_admin_stats(
     current_user: models.User = Depends(get_current_user),
