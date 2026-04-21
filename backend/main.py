@@ -81,9 +81,17 @@ To get a token:
         "persistAuthorization": True,      # keep auth token across page refreshes
     },
 )
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+
+if not IS_VERCEL:
+    UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+    
+    # Only create locally
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+else:
+    UPLOAD_DIR = None
 
 app.add_middleware(
     CORSMiddleware,
