@@ -43,7 +43,12 @@ class _AlumniDirectoryScreenState extends State<AlumniDirectoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Alumni Directory')),
+      appBar: AppBar(
+        title: const Text('Alumni Directory'),
+        leading: Navigator.canPop(context)
+            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
+            : null,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _alumniList.isEmpty

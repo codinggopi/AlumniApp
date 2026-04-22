@@ -86,6 +86,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Educational Resources'),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
         actions: [
           if (isStaffOrAdmin)
             IconButton(

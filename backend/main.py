@@ -435,7 +435,7 @@ def ensure_connected(db: Session, sender_id: int, receiver_id: int):
 @app.get("/")
 def home():
     return {
-        "message": "Alumni App backend running",
+        "message": "Alumni App backend is running",
         "modules": ["auth", "directory", "internships", "applications", "events"],
     }
 
@@ -766,6 +766,83 @@ def list_alumni(
 
     results = query.all()
     return [serialize_alumni(user, profile) for user, profile in results]
+
+
+# ── Student Streak ────────────────────────────────────────────────────────────
+
+@app.post("/student/checkin", tags=["profile"])
+def student_checkin(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
+
+    import json as _json
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    row = db.query(models.StudentStreak).filter(
+        models.StudentStreak.student_id == current_user.user_id
+    ).first()
+
+    if not row:
+        row = models.StudentStreak(
+            student_id=current_user.user_id,
+            current_streak=1,
+            longest_streak=1,
+            last_checkin=today,
+            checkin_history=_json.dumps([today]),
+        )
+        db.add(row)
+        db.commit()
+        return {"streak": 1, "longest": 1, "already_checked_in": False}
+
+    if row.last_checkin == today:
+        history = _json.loads(row.checkin_history or "[]")
+        return {"streak": row.current_streak, "longest": row.longest_streak, "already_checked_in": True, "history": history[-30:]}
+
+    history = _json.loads(row.checkin_history or "[]")
+    history.append(today)
+    history = history[-90:]  # keep last 90 days
+
+    # Calculate new streak
+    if row.last_checkin:
+        from datetime import date as _date
+        last = _date.fromisoformat(row.last_checkin)
+        tod = _date.fromisoformat(today)
+        diff = (tod - last).days
+        new_streak = row.current_streak + 1 if diff == 1 else 1
+    else:
+        new_streak = 1
+
+    new_longest = max(row.longest_streak, new_streak)
+    row.current_streak = new_streak
+    row.longest_streak = new_longest
+    row.last_checkin = today
+    row.checkin_history = _json.dumps(history)
+    db.commit()
+
+    return {"streak": new_streak, "longest": new_longest, "already_checked_in": False, "history": history[-30:]}
+
+
+@app.get("/student/streak", tags=["profile"])
+def get_streak(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import json as _json
+    row = db.query(models.StudentStreak).filter(
+        models.StudentStreak.student_id == current_user.user_id
+    ).first()
+    if not row:
+        return {"streak": 0, "longest": 0, "last_checkin": None, "history": []}
+    history = _json.loads(row.checkin_history or "[]")
+    return {
+        "streak": row.current_streak,
+        "longest": row.longest_streak,
+        "last_checkin": row.last_checkin,
+        "history": history[-30:],
+    }
 
 
 @app.get("/student/dashboard", tags=["profile"])
@@ -1185,6 +1262,10 @@ def create_internship(payload: InternshipCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(internship)
 
+    # Award points for posting internship
+    _award_points(db, user.user_id, "internship", 10)
+    db.commit()
+
     notif_title = f"💼 New Internship: {payload.role_title}"
     notif_body = f"{payload.company}" + (f" | {payload.location}" if payload.location else "") + f" — Posted by {user.full_name}"
 
@@ -1577,6 +1658,10 @@ def update_connection_status(
 
     connection.status = normalized_status
     db.commit()
+    # Award points to alumni for accepting connection
+    if normalized_status == "accepted":
+        _award_points(db, current_user.user_id, "connection", 5)
+        db.commit()
     return {"connection_id": connection.connection_id, "status": connection.status}
 
 
@@ -2242,3 +2327,530 @@ def custom_openapi():
 
 
 app.openapi = custom_openapi
+
+
+# ── Alumni Dashboard ────────────────────────────────────────────────────────
+
+@app.get("/alumni/dashboard", tags=["alumni"])
+def get_alumni_dashboard(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+
+    uid = current_user.user_id
+
+    # Internships posted
+    internships_posted = db.query(models.Internship).filter(
+        models.Internship.posted_by == uid
+    ).count()
+
+    # Total applicants across all my internships
+    my_internship_ids = [i.internship_id for i in db.query(models.Internship.internship_id).filter(
+        models.Internship.posted_by == uid
+    ).all()]
+    total_applicants = db.query(models.Application).filter(
+        models.Application.internship_id.in_(my_internship_ids)
+    ).count() if my_internship_ids else 0
+
+    # New applicants (unread — Applied status)
+    new_applicants = db.query(models.Application).filter(
+        models.Application.internship_id.in_(my_internship_ids),
+        models.Application.status == "Applied",
+    ).count() if my_internship_ids else 0
+
+    # Students connected
+    from sqlalchemy import or_
+    students_connected = db.query(models.Connection).filter(
+        models.Connection.status == "accepted",
+        or_(models.Connection.requester_id == uid, models.Connection.receiver_id == uid)
+    ).count()
+
+    # Pending connection requests
+    pending_requests = db.query(models.Connection).filter(
+        models.Connection.receiver_id == uid,
+        models.Connection.status == "pending",
+    ).count()
+
+    # Unread messages
+    unread_msgs = db.query(models.Message).filter(
+        models.Message.receiver_id == uid,
+        models.Message.is_read == False,
+    ).count()
+
+    # Points
+    points_row = db.query(models.AlumniPoints).filter(
+        models.AlumniPoints.alumni_id == uid
+    ).first()
+    points = points_row.points if points_row else 0
+
+    # Recent notifications
+    recent = db.query(models.Notification).filter(
+        models.Notification.user_id == uid
+    ).order_by(models.Notification.created_at.desc()).limit(5).all()
+
+    # Pending connection requests detail
+    pending_conns = db.query(models.Connection, models.User).join(
+        models.User, models.User.user_id == models.Connection.requester_id
+    ).filter(
+        models.Connection.receiver_id == uid,
+        models.Connection.status == "pending",
+    ).order_by(models.Connection.created_at.desc()).limit(5).all()
+
+    return {
+        "stats": {
+            "internships_posted": internships_posted,
+            "students_connected": students_connected,
+            "unread_messages": unread_msgs,
+            "total_applicants": total_applicants,
+            "new_applicants": new_applicants,
+            "pending_requests": pending_requests,
+            "points": points,
+        },
+        "pending_requests": [
+            {
+                "connection_id": c.connection_id,
+                "student": {
+                    "user_id": s.user_id,
+                    "full_name": s.full_name,
+                    "department": s.department,
+                    "profile_picture_url": s.profile_picture_url,
+                },
+                "created_at": c.created_at.isoformat(),
+            } for c, s in pending_conns
+        ],
+        "recent_activity": [
+            {
+                "message": r.message,
+                "type": r.type,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "is_read": r.is_read,
+            } for r in recent
+        ],
+    }
+
+
+# ── Feedback ─────────────────────────────────────────────────────────────────
+
+class FeedbackCreate(BaseModel):
+    target_id: int
+    target_role: str     # 'alumni' or 'staff'
+    rating: int          # 1–5
+    message: Optional[str] = None
+
+
+def _serialize_feedback(f, include_target=True):
+    d = {
+        "feedback_id": f.feedback_id,
+        "rating": f.rating,
+        "message": f.message,
+        "admin_response": f.admin_response,
+        "target_role": f.target_role,
+        "created_at": f.created_at.isoformat(),
+        "student_name": f.student.full_name if f.student else "Unknown",
+        "student_picture": f.student.profile_picture_url if f.student else None,
+        "student_department": f.student.department if f.student else None,
+    }
+    if include_target:
+        d["target_id"] = f.target_id
+        d["target_name"] = f.target.full_name if f.target else "Unknown"
+        d["target_picture"] = f.target.profile_picture_url if f.target else None
+    return d
+
+
+@app.post("/feedback", tags=["feedback"])
+def submit_feedback(
+    payload: FeedbackCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
+    if payload.target_role not in ("alumni", "staff"):
+        raise HTTPException(status_code=400, detail="target_role must be 'alumni' or 'staff'")
+    if not (1 <= payload.rating <= 5):
+        raise HTTPException(status_code=400, detail="Rating must be 1–5")
+    target = db.query(models.User).filter(models.User.user_id == payload.target_id).first()
+    if not target or target.role != payload.target_role:
+        raise HTTPException(status_code=404, detail="Target user not found")
+    # One feedback per student per target — locked until deleted
+    existing = db.query(models.Feedback).filter(
+        models.Feedback.student_id == current_user.user_id,
+        models.Feedback.target_id == payload.target_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="You have already submitted feedback for this person. Delete it first to submit again.")
+    fb = models.Feedback(
+        student_id=current_user.user_id,
+        target_id=payload.target_id,
+        target_role=payload.target_role,
+        rating=payload.rating,
+        message=payload.message,
+    )
+    db.add(fb)
+    db.commit()
+    db.refresh(fb)
+    return {"feedback_id": fb.feedback_id}
+
+
+@app.delete("/feedback/{feedback_id}", tags=["feedback"])
+def delete_feedback(
+    feedback_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    fb = db.query(models.Feedback).filter(models.Feedback.feedback_id == feedback_id).first()
+    if not fb:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    if fb.student_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your feedback")
+    db.delete(fb)
+    db.commit()
+    return {"detail": "Deleted"}
+
+
+@app.get("/feedback/sent", tags=["feedback"])
+def get_sent_feedback(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Student sees their own submitted feedbacks."""
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
+    rows = db.query(models.Feedback).filter(
+        models.Feedback.student_id == current_user.user_id
+    ).order_by(models.Feedback.created_at.desc()).all()
+    return [_serialize_feedback(f) for f in rows]
+
+
+@app.get("/feedback/received", tags=["feedback"])
+def get_received_feedback(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Alumni or staff sees feedback addressed to them."""
+    if current_user.role not in ("alumni", "staff"):
+        raise HTTPException(status_code=403, detail="Alumni or staff only")
+    rows = db.query(models.Feedback).filter(
+        models.Feedback.target_id == current_user.user_id
+    ).order_by(models.Feedback.created_at.desc()).all()
+    avg = round(sum(f.rating for f in rows) / len(rows), 1) if rows else 0
+    return {
+        "average_rating": avg,
+        "total": len(rows),
+        "feedbacks": [_serialize_feedback(f, include_target=False) for f in rows],
+    }
+
+
+@app.get("/feedback/all", tags=["feedback"])
+def get_all_feedback(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin sees all feedbacks."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    rows = db.query(models.Feedback).order_by(models.Feedback.created_at.desc()).all()
+    return [_serialize_feedback(f) for f in rows]
+
+
+@app.patch("/feedback/{feedback_id}/respond", tags=["feedback"])
+def respond_to_feedback(
+    feedback_id: int,
+    payload: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin adds a response to a feedback."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    fb = db.query(models.Feedback).filter(models.Feedback.feedback_id == feedback_id).first()
+    if not fb:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    fb.admin_response = payload.get("response", "")
+    db.commit()
+    return {"detail": "Response saved"}
+
+
+# ── Mentorship Slots ─────────────────────────────────────────────────────────
+
+class MentorshipSlotCreate(BaseModel):
+    day: str
+    time_from: str
+    time_to: str
+    max_students: int = 3
+
+
+@app.post("/mentorship/slots", tags=["alumni"])
+def create_slot(
+    payload: MentorshipSlotCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+    slot = models.MentorshipSlot(
+        alumni_id=current_user.user_id,
+        day=payload.day,
+        time_from=payload.time_from,
+        time_to=payload.time_to,
+        max_students=payload.max_students,
+    )
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    return {"slot_id": slot.slot_id}
+
+
+@app.get("/mentorship/slots/{alumni_id}", tags=["alumni"])
+def get_slots(alumni_id: int, db: Session = Depends(get_db)):
+    slots = db.query(models.MentorshipSlot).filter(
+        models.MentorshipSlot.alumni_id == alumni_id
+    ).all()
+    return [
+        {
+            "slot_id": s.slot_id,
+            "day": s.day,
+            "time_from": s.time_from,
+            "time_to": s.time_to,
+            "max_students": s.max_students,
+            "booked": len(s.bookings),
+            "available": s.max_students - len(s.bookings),
+        } for s in slots
+    ]
+
+
+@app.post("/mentorship/slots/{slot_id}/book", tags=["alumni"])
+def book_slot(
+    slot_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Students only")
+    slot = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.slot_id == slot_id).first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    if len(slot.bookings) >= slot.max_students:
+        raise HTTPException(status_code=400, detail="Slot is full")
+    existing = db.query(models.MentorshipBooking).filter(
+        models.MentorshipBooking.slot_id == slot_id,
+        models.MentorshipBooking.student_id == current_user.user_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already booked")
+    booking = models.MentorshipBooking(slot_id=slot_id, student_id=current_user.user_id)
+    db.add(booking)
+    db.commit()
+    return {"booking_id": booking.booking_id, "status": "pending"}
+
+
+@app.delete("/mentorship/slots/{slot_id}", tags=["alumni"])
+def delete_slot(
+    slot_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+    slot = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.slot_id == slot_id).first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    if slot.alumni_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your slot")
+    db.query(models.MentorshipBooking).filter(models.MentorshipBooking.slot_id == slot_id).delete()
+    db.delete(slot)
+    db.commit()
+    return {"detail": "Slot deleted"}
+
+
+@app.get("/mentorship/slots/{slot_id}/students", tags=["alumni"])
+def get_slot_students(
+    slot_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+    slot = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.slot_id == slot_id).first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    if slot.alumni_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your slot")
+    return [
+        {
+            "booking_id": b.booking_id,
+            "status": b.status,
+            "booked_at": b.created_at.isoformat() if b.created_at else None,
+            "student_id": b.student.user_id,
+            "student_name": b.student.full_name,
+            "student_email": b.student.email,
+            "student_department": b.student.department,
+            "student_picture": b.student.profile_picture_url,
+        }
+        for b in slot.bookings
+    ]
+
+
+@app.patch("/mentorship/bookings/{booking_id}/status", tags=["alumni"])
+def update_booking_status(
+    booking_id: int,
+    payload: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+    booking = db.query(models.MentorshipBooking).filter(
+        models.MentorshipBooking.booking_id == booking_id
+    ).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.slot.alumni_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your slot")
+    new_status = payload.get("status")
+    if new_status not in ("confirmed", "rejected", "completed"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    booking.status = new_status
+    db.commit()
+    return {"detail": "Status updated"}
+
+
+@app.get("/mentorship/available", tags=["alumni"])
+def get_available_slots(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """All slots from all alumni with availability info, for students to browse."""
+    slots = db.query(models.MentorshipSlot).all()
+    result = []
+    for s in slots:
+        alumni_user = db.query(models.User).filter(models.User.user_id == s.alumni_id).first()
+        alumni_profile = db.query(models.AlumniProfile).filter(
+            models.AlumniProfile.alumni_id == s.alumni_id
+        ).first()
+        booked = len(s.bookings)
+        available = s.max_students - booked
+        # check if current student already booked this slot
+        already_booked = any(b.student_id == current_user.user_id for b in s.bookings)
+        result.append({
+            "slot_id": s.slot_id,
+            "day": s.day,
+            "time_from": s.time_from,
+            "time_to": s.time_to,
+            "max_students": s.max_students,
+            "booked": booked,
+            "available": available,
+            "already_booked": already_booked,
+            "alumni_id": s.alumni_id,
+            "alumni_name": alumni_user.full_name if alumni_user else "Unknown",
+            "alumni_job_title": alumni_profile.job_title if alumni_profile else None,
+            "alumni_company": alumni_profile.company if alumni_profile else None,
+            "alumni_picture": alumni_user.profile_picture_url if alumni_user else None,
+        })
+    return result
+
+
+@app.get("/mentorship/my-bookings", tags=["alumni"])
+def get_my_bookings(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Student's own bookings."""
+    bookings = db.query(models.MentorshipBooking).filter(
+        models.MentorshipBooking.student_id == current_user.user_id
+    ).all()
+    result = []
+    for b in bookings:
+        s = b.slot
+        alumni_user = db.query(models.User).filter(models.User.user_id == s.alumni_id).first()
+        alumni_profile = db.query(models.AlumniProfile).filter(
+            models.AlumniProfile.alumni_id == s.alumni_id
+        ).first()
+        result.append({
+            "booking_id": b.booking_id,
+            "status": b.status,
+            "slot_id": s.slot_id,
+            "day": s.day,
+            "time_from": s.time_from,
+            "time_to": s.time_to,
+            "alumni_name": alumni_user.full_name if alumni_user else "Unknown",
+            "alumni_job_title": alumni_profile.job_title if alumni_profile else None,
+            "alumni_company": alumni_profile.company if alumni_profile else None,
+            "alumni_picture": alumni_user.profile_picture_url if alumni_user else None,
+        })
+    return result
+
+
+# ── Points & Leaderboard ─────────────────────────────────────────────────────
+
+def _award_points(db, alumni_id: int, action: str, pts: int):
+    row = db.query(models.AlumniPoints).filter(models.AlumniPoints.alumni_id == alumni_id).first()
+    if not row:
+        row = models.AlumniPoints(alumni_id=alumni_id, points=0)
+        db.add(row)
+    row.points += pts
+    if action == "internship":
+        row.internships_posted += 1
+    elif action == "answer":
+        row.questions_answered += 1
+    elif action == "mentorship":
+        row.mentorships_completed += 1
+    elif action == "connection":
+        row.students_connected += 1
+
+
+@app.get("/alumni/leaderboard", tags=["alumni"])
+def get_leaderboard(db: Session = Depends(get_db)):
+    rows = db.query(models.AlumniPoints, models.User).join(
+        models.User, models.User.user_id == models.AlumniPoints.alumni_id
+    ).order_by(models.AlumniPoints.points.desc()).limit(10).all()
+
+    result = []
+    for rank, (pts, user) in enumerate(rows, start=1):
+        badges = _compute_badges(pts)
+        result.append({
+            "rank": rank,
+            "user_id": user.user_id,
+            "full_name": user.full_name,
+            "profile_picture_url": user.profile_picture_url,
+            "points": pts.points,
+            "badges": badges,
+            "internships_posted": pts.internships_posted,
+            "questions_answered": pts.questions_answered,
+            "mentorships_completed": pts.mentorships_completed,
+        })
+    return result
+
+
+def _compute_badges(pts: models.AlumniPoints) -> list:
+    badges = []
+    if pts.mentorships_completed >= 20:
+        badges.append({"name": "Top Mentor", "icon": "🏆"})
+    elif pts.mentorships_completed >= 5:
+        badges.append({"name": "Mentor", "icon": "🎓"})
+    if pts.internships_posted >= 5:
+        badges.append({"name": "Opportunity Giver", "icon": "💼"})
+    if pts.questions_answered >= 10:
+        badges.append({"name": "Active Contributor", "icon": "⭐"})
+    if pts.students_connected >= 10:
+        badges.append({"name": "Connector", "icon": "🤝"})
+    if pts.points >= 100:
+        badges.append({"name": "Alumni Star", "icon": "🌟"})
+    return badges
+
+
+@app.get("/alumni/my-points", tags=["alumni"])
+def get_my_points(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(models.AlumniPoints).filter(models.AlumniPoints.alumni_id == current_user.user_id).first()
+    if not row:
+        return {"points": 0, "badges": [], "internships_posted": 0, "questions_answered": 0, "mentorships_completed": 0}
+    return {
+        "points": row.points,
+        "badges": _compute_badges(row),
+        "internships_posted": row.internships_posted,
+        "questions_answered": row.questions_answered,
+        "mentorships_completed": row.mentorships_completed,
+        "students_connected": row.students_connected,
+    }

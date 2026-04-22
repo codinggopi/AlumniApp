@@ -218,3 +218,102 @@ class OtpStore(Base):
     email = Column(String(255), primary_key=True, index=True)
     otp = Column(String(128),nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    feedback_id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    target_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)   # alumni or staff
+    target_role = Column(String(20), nullable=False)                            # 'alumni' or 'staff'
+    rating = Column(Integer, nullable=False)          # 1–5
+    message = Column(Text, nullable=True)
+    admin_response = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    student = relationship("User", foreign_keys=[student_id])
+    target = relationship("User", foreign_keys=[target_id])
+
+
+class QAQuestion(Base):
+    __tablename__ = "qa_questions"
+
+    question_id = Column(Integer, primary_key=True, index=True)
+    asked_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    title = Column(String(300), nullable=False)
+    body = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    asker = relationship("User", foreign_keys=[asked_by])
+    answers = relationship("QAAnswer", back_populates="question", cascade="all, delete-orphan")
+
+
+class QAAnswer(Base):
+    __tablename__ = "qa_answers"
+
+    answer_id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("qa_questions.question_id"), nullable=False)
+    answered_by = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    body = Column(Text, nullable=False)
+    upvotes = Column(Integer, default=0, nullable=False)
+    is_best = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    question = relationship("QAQuestion", back_populates="answers")
+    answerer = relationship("User", foreign_keys=[answered_by])
+
+
+class StudentStreak(Base):
+    __tablename__ = "student_streaks"
+
+    student_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    current_streak = Column(Integer, default=0, nullable=False)
+    longest_streak = Column(Integer, default=0, nullable=False)
+    last_checkin = Column(String(20), nullable=True)   # "YYYY-MM-DD"
+    checkin_history = Column(Text, nullable=True)       # JSON list of "YYYY-MM-DD" strings
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    student = relationship("User", foreign_keys=[student_id])
+
+
+class MentorshipSlot(Base):
+    __tablename__ = "mentorship_slots"
+
+    slot_id = Column(Integer, primary_key=True, index=True)
+    alumni_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    day = Column(String(20), nullable=False)       # e.g. "Saturday"
+    time_from = Column(String(10), nullable=False)  # e.g. "17:00"
+    time_to = Column(String(10), nullable=False)    # e.g. "19:00"
+    max_students = Column(Integer, default=3, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    alumni = relationship("User", foreign_keys=[alumni_id])
+    bookings = relationship("MentorshipBooking", back_populates="slot", cascade="all, delete-orphan")
+
+
+class MentorshipBooking(Base):
+    __tablename__ = "mentorship_bookings"
+
+    booking_id = Column(Integer, primary_key=True, index=True)
+    slot_id = Column(Integer, ForeignKey("mentorship_slots.slot_id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending, confirmed, completed
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    slot = relationship("MentorshipSlot", back_populates="bookings")
+    student = relationship("User", foreign_keys=[student_id])
+
+
+class AlumniPoints(Base):
+    __tablename__ = "alumni_points"
+
+    alumni_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    points = Column(Integer, default=0, nullable=False)
+    internships_posted = Column(Integer, default=0, nullable=False)
+    questions_answered = Column(Integer, default=0, nullable=False)
+    mentorships_completed = Column(Integer, default=0, nullable=False)
+    students_connected = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    alumni = relationship("User", foreign_keys=[alumni_id])

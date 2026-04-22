@@ -151,3 +151,24 @@ def ensure_schema_updates():
         if "is_read" not in msg_cols:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN DEFAULT 0 NOT NULL"))
+
+    # Feedback table migration: old schema had alumni_id, new schema uses target_id + target_role + admin_response
+    if "feedback" in inspector.get_table_names():
+        fb_cols = {c["name"] for c in inspector.get_columns("feedback")}
+        if "target_id" not in fb_cols:
+            # Recreate the table with the new schema (SQLite doesn't support DROP COLUMN)
+            with engine.begin() as connection:
+                connection.execute(text("DROP TABLE feedback"))
+            # Let create_all recreate it with the new schema
+            try:
+                from . import models
+            except (ImportError, ValueError):
+                import models
+            models.Base.metadata.tables["feedback"].create(bind=engine)
+        else:
+            if "target_role" not in fb_cols:
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE feedback ADD COLUMN target_role VARCHAR(20) NOT NULL DEFAULT 'alumni'"))
+            if "admin_response" not in fb_cols:
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE feedback ADD COLUMN admin_response TEXT"))

@@ -122,7 +122,12 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
     final user = Provider.of<AuthProvider>(context).user;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Internship Board')),
+      appBar: AppBar(
+        title: Text(widget.postedBy != null ? 'Internships' : 'Internship Board'),
+        leading: Navigator.canPop(context)
+            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
+            : null,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

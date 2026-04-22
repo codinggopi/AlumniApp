@@ -25,11 +25,17 @@ import 'screens/resources/resource_list_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/notifications/send_notification_screen.dart';
 import 'screens/dashboard/student_dashboard.dart';
+import 'screens/dashboard/alumni_dashboard.dart';
+import 'screens/dashboard/alumni_leaderboard_screen.dart';
+import 'screens/dashboard/alumni_mentorship_screen.dart';
+import 'screens/feedback/feedback_screen.dart';
+import 'screens/todo/todo_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await FcmService.initialize();
+  await initTodoNotifications();
   await ApiService.init();
   
   runApp(
@@ -603,6 +609,8 @@ class _DashboardViewState extends State<DashboardView> {
                 _AdminStatsWidget(key: ValueKey(_statsRefreshKey))
               else if (role == 'student')
                 StudentDashboard(key: ValueKey(_statsRefreshKey), onTabChange: widget.onTabChange)
+              else if (role == 'alumni')
+                AlumniDashboard(key: ValueKey(_statsRefreshKey), onTabChange: widget.onTabChange)
               else
                 _WelcomeTip(role: role),
             ],
@@ -1270,7 +1278,56 @@ class _SideDrawerState extends State<_SideDrawer> {
                     ),
             ),
             const Divider(height: 1),
-            ListTile(
+            // Role-specific items
+            if (widget.role == 'alumni') ...[
+              ListTile(
+                leading: const Icon(Icons.rate_review_outlined, color: Color(0xFF7B1FA2)),
+                title: const Text('My Feedback', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.school_outlined, color: Color(0xFF00897B)),
+                title: const Text('Mentorship Slots', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniMentorshipScreen()));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.leaderboard_outlined, color: Color(0xFFF57C00)),
+                title: const Text('Leaderboard', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniLeaderboardScreen()));
+                },
+              ),
+              const Divider(height: 1),
+            ],
+            if (widget.role == 'student' || widget.role == 'staff' || widget.role == 'admin') ...[
+              ListTile(
+                leading: const Icon(Icons.rate_review_outlined, color: Color(0xFF7B1FA2)),
+                title: const Text('Feedback', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+                },
+              ),
+              const Divider(height: 1),
+            ],
+            if (widget.role == 'student') ...[
+              ListTile(
+                leading: const Icon(Icons.checklist_rounded, color: Color(0xFF1565C0)),
+                title: const Text('My Tasks', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TodoScreen()));
+                },
+              ),
+              const Divider(height: 1),
+            ],            ListTile(
               leading: const Icon(Icons.person_outline, color: Color(0xFF1565C0)),
               title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               onTap: () {

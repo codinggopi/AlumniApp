@@ -84,6 +84,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Connection Requests'),
+        leading: Navigator.canPop(context)
+            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
+            : null,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchRequests),
         ],

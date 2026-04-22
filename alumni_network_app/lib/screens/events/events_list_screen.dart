@@ -112,6 +112,9 @@ class _EventsListScreenState extends State<EventsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Events & News'),
+        leading: Navigator.canPop(context)
+            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
+            : null,
         actions: [
           if (isAdminOrStaff && _events.isNotEmpty)
             IconButton(

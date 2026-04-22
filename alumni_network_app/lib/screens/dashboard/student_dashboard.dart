@@ -8,6 +8,8 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../directory/alumni_directory.dart';
 import '../profile/edit_profile_screen.dart';
+import 'student_mentorship_screen.dart';
+import '../todo/todo_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -21,6 +23,8 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   Map<String, dynamic>? _data;
   bool _apiLoading = true;
   int _streak = 0;
+  int _longestStreak = 0;
+  List<String> _checkinHistory = [];
   bool _challengeDone = false;
   final RouteObserver<ModalRoute<void>> _routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -28,7 +32,6 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   void initState() {
     super.initState();
     _fetchDashboard();
-    _loadStreak();
     _doCheckIn();
   }
 
@@ -70,55 +73,30 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
     }
   }
 
-  Future<void> _loadStreak() async {
-    final prefs = await SharedPreferences.getInstance();
-    final streak = prefs.getInt('streak_count') ?? 0;
-    final done = prefs.getBool('challenge_done_${_weekKey()}') ?? false;
-    if (mounted) {
-      setState(() {
-        _streak = streak;
-        _challengeDone = done;
-      });
-    }
-  }
-
   Future<void> _doCheckIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month}-${today.day}';
-    final lastStr = prefs.getString('streak_last_date');
-
-    if (lastStr == todayStr) return; // already checked in today
-
-    int streak = prefs.getInt('streak_count') ?? 0;
-    if (lastStr != null) {
-      final last = DateTime.tryParse(lastStr);
-      if (last != null) {
-        final diff = today.difference(last).inDays;
-        streak = diff == 1 ? streak + 1 : 1; // consecutive = +1, else reset
+    try {
+      final res = await ApiService().post('/student/checkin', {});
+      if (res.statusCode == 200 && mounted) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          _streak = data['streak'] ?? 0;
+          _longestStreak = data['longest'] ?? 0;
+          _checkinHistory = List<String>.from(data['history'] ?? []);
+        });
       }
-    } else {
-      streak = 1;
-    }
-
-    await prefs.setInt('streak_count', streak);
-    await prefs.setString('streak_last_date', todayStr);
-    if (mounted) setState(() => _streak = streak);
-  }
-
-  String _weekKey() {
-    final now = DateTime.now();
-    return 'week_${now.year}_${_weekNumber(now)}';
+    } catch (_) {}
   }
 
   int _weekNumber(DateTime date) {
     final firstDay = DateTime(date.year, 1, 1);
-    return ((date.difference(firstDay).inDays) / 7).ceil();
+    return ((date.difference(firstDay).inDays) / 7).floor() + 1;
   }
 
   Future<void> _markChallengeDone() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('challenge_done_${_weekKey()}', true);
+    final now = DateTime.now();
+    final weekKey = 'challenge_done_week_${now.year}_${_weekNumber(now)}';
+    await prefs.setBool(weekKey, true);
     setState(() => _challengeDone = true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -222,11 +200,30 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
         // 6. Weekly Challenge
         _buildWeeklyChallenge(),
 
-        // 7. Find a Mentor
+        // 7. My Tasks quick card
+        _buildTodoQuickCard(),
+
+        // 8. Find a Mentor
         _sectionHeader('🎓 Find a Mentor'),
         _apiLoading ? _buildSkeletonCard() : mentors.isNotEmpty
             ? _buildMentorSection(mentors)
-            : _buildEmptyCard('No mentors available right now.', Icons.school_outlined),
+            : Column(children: [
+                _buildEmptyCard('No mentors available right now.', Icons.school_outlined),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentMentorshipScreen())),
+                    icon: const Icon(Icons.school, size: 16),
+                    label: const Text('Browse Mentorship Sessions'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00897B),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ]),
 
         // 8. My Resume
         _buildResumeCard(user),
@@ -333,38 +330,197 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   );
 
   // ── 2. Streak ──────────────────────────────────────────────────────────────
-  Widget _buildStreakCard() => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [Color(0xFFFF6F00), Color(0xFFFF8F00)]),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: Row(
-      children: [
-        const Text('🔥', style: TextStyle(fontSize: 28)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+  Widget _buildStreakCard() {
+    final milestones = [3, 7, 14, 30, 60, 100];
+    final nextMilestone = milestones.firstWhere((m) => m > _streak, orElse: () => 0);
+    final progressToNext = nextMilestone > 0 ? _streak / nextMilestone : 1.0;
+
+    // Build last 7 days check-in strip
+    final today = DateTime.now();
+    final historySet = _checkinHistory.toSet();
+    final last7 = List.generate(7, (i) {
+      final d = today.subtract(Duration(days: 6 - i));
+      final key = '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+      return (d, historySet.contains(key));
+    });
+
+    final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    return GestureDetector(
+      onTap: () => _showStreakDetail(),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF6F00), Color(0xFFFF8F00)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: const Color(0xFFFF6F00).withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Text('🔥', style: TextStyle(fontSize: 28)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 '$_streak day streak!',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
               ),
               Text(
-                _streak == 0 ? 'Open the app daily to build your streak' : 'Keep it up — come back tomorrow!',
+                _streak == 0
+                    ? 'Open the app daily to build your streak'
+                    : nextMilestone > 0
+                        ? '${nextMilestone - _streak} more days to reach $_streak→$nextMilestone 🎯'
+                        : 'Amazing! 100+ day streak! 🏆',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
-            ],
+            ])),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text('Best: $_longestStreak',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+              ),
+              const SizedBox(height: 4),
+              const Text('tap for details', style: TextStyle(color: Colors.white54, fontSize: 10)),
+            ]),
+          ]),
+          const SizedBox(height: 14),
+          // Progress to next milestone
+          if (nextMilestone > 0) ...[
+            Row(children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progressToNext.clamp(0.0, 1.0),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
+                    color: Colors.white,
+                    minHeight: 6,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('$nextMilestone 🎯',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 12),
+          ],
+          // 7-day strip
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final (date, checked) = last7[i];
+              final isToday = date.day == today.day &&
+                  date.month == today.month &&
+                  date.year == today.year;
+              final dayLabel = dayLabels[date.weekday - 1];
+              return Column(children: [
+                Text(dayLabel,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: checked
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.2),
+                    border: isToday
+                        ? Border.all(color: Colors.white, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: checked
+                        ? const Text('🔥', style: TextStyle(fontSize: 14))
+                        : Text('${date.day}',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]);
+            }),
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
-          child: Text('Day $_streak', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-        ),
-      ],
+        ]),
+      ),
+    );
+  }
+
+  void _showStreakDetail() {
+    final milestones = {3: '🥉', 7: '🥈', 14: '🥇', 30: '💎', 60: '👑', 100: '🏆'};
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('🔥 Your Streak', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 16),
+          Row(children: [
+            _statBox('Current', '$_streak days', const Color(0xFFFF6F00)),
+            const SizedBox(width: 12),
+            _statBox('Best', '$_longestStreak days', const Color(0xFF1565C0)),
+            const SizedBox(width: 12),
+            _statBox('Check-ins', '${_checkinHistory.length}', const Color(0xFF2E7D32)),
+          ]),
+          const SizedBox(height: 20),
+          const Text('Milestones', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: milestones.entries.map((e) {
+              final reached = _longestStreak >= e.key;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: reached ? const Color(0xFFFFF8E1) : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: reached ? const Color(0xFFFFC107) : Colors.grey[300]!),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(e.value, style: TextStyle(fontSize: 16, color: reached ? null : const Color(0xFFBDBDBD))),
+                  const SizedBox(width: 6),
+                  Text('${e.key} days',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: reached ? const Color(0xFFF57C00) : Colors.grey[400])),
+                ]),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  Widget _statBox(String label, String value, Color color) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+      ]),
     ),
   );
 
@@ -531,7 +687,64 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
     ),
   );
 
-  // ── 7. Find a Mentor ───────────────────────────────────────────────────────
+  // ── 7. To-Do Quick Card ────────────────────────────────────────────────────
+  Widget _buildTodoQuickCard() {
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+        final prefs = snap.data!;
+        final raw = prefs.getString('todos') ?? '[]';
+        final List todos = jsonDecode(raw);
+        final pending = todos.where((t) => t['done'] == false).length;
+        final overdue = todos.where((t) {
+          if (t['done'] == true || t['dueDateTime'] == null) return false;
+          return DateTime.parse(t['dueDateTime']).isBefore(DateTime.now());
+        }).length;
+
+        return GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TodoScreen())),
+          child: Container(
+            margin: const EdgeInsets.only(top: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.2)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.checklist_rounded, color: Color(0xFF1565C0), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('My Tasks', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text(
+                  pending == 0
+                      ? 'All done! Great work 🎉'
+                      : overdue > 0
+                          ? '$overdue overdue · $pending pending'
+                          : '$pending task${pending != 1 ? 's' : ''} pending',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: overdue > 0 ? Colors.red : const Color(0xFF9E9E9E)),
+                ),
+              ])),
+              const Icon(Icons.chevron_right, color: Color(0xFF1565C0)),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── 8. Find a Mentor ───────────────────────────────────────────────────────
   Widget _buildMentorSection(List mentors) => Column(
     children: [
       ...mentors.map((m) => Container(
@@ -569,11 +782,30 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
           ],
         ),
       )),
-      TextButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniDirectoryScreen())),
-        icon: const Icon(Icons.search, size: 16),
-        label: const Text('Browse All Alumni'),
-        style: TextButton.styleFrom(foregroundColor: const Color(0xFF1565C0)),
+      Row(
+        children: [
+          Expanded(
+            child: TextButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniDirectoryScreen())),
+              icon: const Icon(Icons.search, size: 16),
+              label: const Text('Browse All Alumni'),
+              style: TextButton.styleFrom(foregroundColor: const Color(0xFF1565C0)),
+            ),
+          ),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentMentorshipScreen())),
+              icon: const Icon(Icons.school, size: 16),
+              label: const Text('Book a Session'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00897B),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ],
       ),
     ],
   );

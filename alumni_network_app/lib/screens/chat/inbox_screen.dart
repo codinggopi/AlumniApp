@@ -62,6 +62,9 @@ class _InboxScreenState extends State<InboxScreen> {
           'My Messages',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        leading: Navigator.canPop(context)
+            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
+            : null,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
