@@ -530,7 +530,7 @@ class _TodoScreenState extends State<TodoScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addOrEdit(),
         icon: const Icon(Icons.add),
-        label: const Text('Add Task'),
+        label: const Text('Add Tasks'),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
