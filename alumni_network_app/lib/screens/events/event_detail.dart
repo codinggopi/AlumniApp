@@ -15,9 +15,6 @@ class EventDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event Details'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black,
         actions: [],
       ),
       body: SingleChildScrollView(
@@ -118,10 +115,10 @@ class EventDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     event.description ?? "No description provided.",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       height: 1.5,
-                      color: Colors.black87,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
                     ),
                   ),
                   const SizedBox(height: 30),

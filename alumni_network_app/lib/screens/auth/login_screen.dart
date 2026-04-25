@@ -113,13 +113,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.blue, Colors.indigo],
+            colors: [theme.primaryColor, theme.colorScheme.secondary],
           ),
         ),
         child: Center(
@@ -134,9 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.school, size: 60, color: Colors.blue),
+                      Icon(Icons.school, size: 60, color: theme.primaryColor),
                       const SizedBox(height: 10),
-                      const Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text('Welcome Back', style: theme.textTheme.titleLarge?.copyWith(fontSize: 24)),
                       const SizedBox(height: 30),
                       TextField(
                         controller: _emailController,
@@ -197,11 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Checkbox(
                               value: _rememberMe,
                               onChanged: (v) => setState(() => _rememberMe = v ?? true),
-                              activeColor: Colors.blue,
+                              activeColor: theme.primaryColor,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('Remember me', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                          Text('Remember me', style: theme.textTheme.bodySmall?.copyWith(fontSize: 13)),
                           const Spacer(),
                           TextButton(
                             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
@@ -215,18 +216,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 50,
                         child: ElevatedButton(
                           onPressed: _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
                           child: const Text('LOGIN', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text("Accounts are created by the Administrator.", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text("Accounts are created by the Administrator.", style: theme.textTheme.bodySmall?.copyWith(fontSize: 13)),
                       const SizedBox(height: 5),
-                      const Text("Please contact your college admin for access.", style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                      Text("Please contact your college admin for access.", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),

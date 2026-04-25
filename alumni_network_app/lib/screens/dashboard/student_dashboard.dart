@@ -221,19 +221,19 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   Widget _buildSkeletonCard() => Container(
     height: 80,
     margin: const EdgeInsets.only(bottom: 4),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+    decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(14)),
     child: Row(
       children: [
         const SizedBox(width: 16),
-        Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12))),
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(12))),
         const SizedBox(width: 14),
         Expanded(child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(height: 14, width: 140, color: Colors.grey[200]),
+            Container(height: 14, width: 140, color: Theme.of(context).dividerColor),
             const SizedBox(height: 8),
-            Container(height: 10, width: 100, color: Colors.grey[100]),
+            Container(height: 10, width: 100, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
           ],
         )),
       ],
@@ -249,12 +249,12 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
 
   Widget _buildEmptyCard(String msg, IconData icon) => Container(
     padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+    decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(14)),
     child: Row(
       children: [
-        Icon(icon, color: Colors.grey[400], size: 22),
+        Icon(icon, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4), size: 22),
         const SizedBox(width: 12),
-        Text(msg, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+        Text(msg, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
       ],
     ),
   );
@@ -262,7 +262,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   // ── Section header ─────────────────────────────────────────────────────────
   Widget _sectionHeader(String title) => Padding(
     padding: const EdgeInsets.fromLTRB(0, 20, 0, 10),
-    child: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
+    child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
   );
 
   // ── 1. Profile Completion ──────────────────────────────────────────────────
@@ -272,24 +272,24 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.2)),
+        border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.person_outline, color: Color(0xFF1565C0), size: 18),
+              Icon(Icons.person_outline, color: Theme.of(context).primaryColor, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Profile $pct% complete — add your ${_missingField(user)}!',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).primaryColor),
                 ),
               ),
-              const Icon(Icons.chevron_right, size: 18, color: Color(0xFF1565C0)),
+              Icon(Icons.chevron_right, size: 18, color: Theme.of(context).primaryColor),
             ],
           ),
           const SizedBox(height: 8),
@@ -297,8 +297,8 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: pct / 100,
-              backgroundColor: const Color(0xFFE3F2FD),
-              color: const Color(0xFF1565C0),
+              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              color: Theme.of(context).primaryColor,
               minHeight: 6,
             ),
           ),
@@ -464,19 +464,19 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: reached ? const Color(0xFFFFF8E1) : Colors.grey[100],
+                  color: reached ? const Color(0xFFFFF8E1) : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                      color: reached ? const Color(0xFFFFC107) : Colors.grey[300]!),
+                      color: reached ? const Color(0xFFFFC107) : Theme.of(context).dividerColor),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(e.value, style: TextStyle(fontSize: 16, color: reached ? null : const Color(0xFFBDBDBD))),
+                  Text(e.value, style: TextStyle(fontSize: 16, color: reached ? null : Theme.of(context).iconTheme.color?.withValues(alpha: 0.3))),
                   const SizedBox(width: 6),
                   Text('${e.key} days',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: reached ? const Color(0xFFF57C00) : Colors.grey[400])),
+                          color: reached ? const Color(0xFFF57C00) : Theme.of(context).textTheme.bodySmall?.color)),
                 ]),
               );
             }).toList(),
@@ -497,15 +497,16 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       ),
       child: Column(children: [
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
       ]),
     ),
   );
 
   // ── 3. Stats Row ───────────────────────────────────────────────────────────
   Widget _buildStatsRow(Map stats) {
+    final theme = Theme.of(context);
     final items = [
-      {'icon': Icons.people, 'label': 'Connections', 'value': '${stats['connections'] ?? 0}', 'color': const Color(0xFF1565C0)},
+      {'icon': Icons.people, 'label': 'Connections', 'value': '${stats['connections'] ?? 0}', 'color': theme.primaryColor},
       {'icon': Icons.chat_bubble, 'label': 'Unread', 'value': '${stats['unread_messages'] ?? 0}', 'color': const Color(0xFFAD1457)},
       {'icon': Icons.work, 'label': 'Applied', 'value': '${stats['applications_sent'] ?? 0}', 'color': const Color(0xFF2E7D32)},
     ];
@@ -514,14 +515,14 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       children: [
         Row(
           children: [
-            const Text('My Stats', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
+            Text('My Stats', style: theme.textTheme.titleSmall?.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
             const Spacer(),
             if (_apiLoading)
               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
             else
               GestureDetector(
                 onTap: _fetchDashboard,
-                child: const Icon(Icons.refresh, size: 18, color: Color(0xFF9E9E9E)),
+                child: Icon(Icons.refresh, size: 18, color: theme.iconTheme.color?.withValues(alpha: 0.5)),
               ),
           ],
         ),
@@ -532,7 +533,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
               ),
@@ -541,7 +542,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                   Icon(item['icon'] as IconData, color: item['color'] as Color, size: 22),
                   const SizedBox(height: 6),
                   Text(item['value'] as String, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: item['color'] as Color)),
-                  Text(item['label'] as String, style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E))),
+                  Text(item['label'] as String, style: theme.textTheme.bodySmall?.copyWith(fontSize: 10)),
                 ],
               ),
             ),
@@ -565,7 +566,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
           margin: EdgeInsets.only(right: 12, left: i == 0 ? 0 : 0),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
           ),
@@ -574,15 +575,15 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
             children: [
               Row(
                 children: [
-                  Icon(isEvent ? Icons.event : Icons.announcement, size: 14, color: isEvent ? Colors.blue : Colors.orange),
+                  Icon(isEvent ? Icons.event : Icons.announcement, size: 14, color: isEvent ? Theme.of(context).primaryColor : Colors.orange),
                   const SizedBox(width: 4),
-                  Text(n['date'] ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+                  Text(n['date'] ?? '', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(n['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(n['title'] ?? '', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
-              Text(n['description'] ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF757575)), maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(n['description'] ?? '', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
           ),
         );
@@ -635,6 +636,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   Widget _buildWeeklyChallenge() {
     final stats = _data?['stats'] ?? {};
     final connections = (stats['connections'] ?? 0) as int;
+    final theme = Theme.of(context);
 
     final goals = [
       _GoalItem(
@@ -642,7 +644,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
         label: 'Connect with 3 alumni',
         current: connections.clamp(0, 3),
         target: 3,
-        color: const Color(0xFF1565C0),
+        color: theme.primaryColor,
       ),
       _GoalItem(
         icon: '🎓',
@@ -659,7 +661,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF7B1FA2).withValues(alpha: 0.25)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
@@ -678,7 +680,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(mainAxisSize: MainAxisSize.min, children: [
@@ -704,17 +706,17 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               Text(g.icon, style: const TextStyle(fontSize: 14)),
               const SizedBox(width: 8),
               Expanded(child: Text(g.label,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w500))),
               Text('${g.current}/${g.target}',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: g.current >= g.target ? g.color : Colors.grey[500])),
+                      color: g.current >= g.target ? g.color : theme.textTheme.bodySmall?.color)),
               const SizedBox(width: 6),
               Icon(
                 g.current >= g.target ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 18,
-                color: g.current >= g.target ? g.color : Colors.grey[300],
+                color: g.current >= g.target ? g.color : theme.dividerColor,
               ),
             ]),
             const SizedBox(height: 4),
@@ -751,7 +753,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
           Container(
             margin: const EdgeInsets.symmetric(vertical: 10),
             width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2)),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -772,12 +774,12 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                 decoration: BoxDecoration(
                   color: g.current >= g.target
                       ? g.color.withValues(alpha: 0.06)
-                      : Colors.grey[50],
+                      : Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: g.current >= g.target
                         ? g.color.withValues(alpha: 0.3)
-                        : Colors.grey[200]!,
+                        : Theme.of(context).dividerColor,
                   ),
                 ),
                 child: Row(children: [
@@ -793,12 +795,12 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                           : '⏳ In progress — ${g.current}/${g.target}',
                       style: TextStyle(
                           fontSize: 12,
-                          color: g.current >= g.target ? g.color : Colors.grey[500]),
+                          color: g.current >= g.target ? g.color : Theme.of(context).textTheme.bodySmall?.color),
                     ),
                   ])),
                   Icon(
                     g.current >= g.target ? Icons.verified : Icons.pending_outlined,
-                    color: g.current >= g.target ? g.color : Colors.grey[400],
+                    color: g.current >= g.target ? g.color : Theme.of(context).iconTheme.color?.withValues(alpha: 0.4),
                   ),
                 ]),
               )),
@@ -811,11 +813,11 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('No recent activity recorded yet.',
-                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  child: Text('No recent activity recorded yet.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
                 )
               else
                 ...activity.map((a) {
@@ -836,9 +838,9 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey[200]!),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(children: [
                       CircleAvatar(
@@ -905,23 +907,23 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
             margin: const EdgeInsets.only(top: 20),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.2)),
+              border: Border.all(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
             ),
             child: Row(children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.checklist_rounded, color: Color(0xFF1565C0), size: 24),
+                child: Icon(Icons.checklist_rounded, color: Theme.of(context).primaryColor, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('My Tasks', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                Text('My Tasks', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
                 Text(
                   pending == 0
                       ? 'All done! Great work 🎉'
@@ -930,10 +932,10 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
                           : '$pending task${pending != 1 ? 's' : ''} pending',
                   style: TextStyle(
                       fontSize: 12,
-                      color: overdue > 0 ? Colors.red : const Color(0xFF9E9E9E)),
+                      color: overdue > 0 ? Colors.red : Theme.of(context).textTheme.bodySmall?.color),
                 ),
               ])),
-              const Icon(Icons.chevron_right, color: Color(0xFF1565C0)),
+              Icon(Icons.chevron_right, color: Theme.of(context).primaryColor),
             ]),
           ),
         );
@@ -948,7 +950,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
         ),
@@ -956,14 +958,14 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: const Color(0xFFE3F2FD),
+              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               backgroundImage: (m['profile_picture_url'] != null && m['profile_picture_url'].toString().isNotEmpty)
                   ? NetworkImage(m['profile_picture_url'].toString().startsWith('http')
                       ? m['profile_picture_url']
                       : '${ApiService.baseUrl}${m['profile_picture_url']}')
                   : null,
               child: (m['profile_picture_url'] == null || m['profile_picture_url'].toString().isEmpty)
-                  ? const Icon(Icons.person, color: Color(0xFF1565C0), size: 22)
+                  ? Icon(Icons.person, color: Theme.of(context).primaryColor, size: 22)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -971,8 +973,8 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(m['full_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  Text('${m['job_title'] ?? ''} @ ${m['company'] ?? ''}', style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)), overflow: TextOverflow.ellipsis),
+                  Text(m['full_name'] ?? '', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text('${m['job_title'] ?? ''} @ ${m['company'] ?? ''}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11), overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -986,7 +988,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniDirectoryScreen())),
               icon: const Icon(Icons.search, size: 16),
               label: const Text('Browse All Alumni'),
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFF1565C0)),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(context).primaryColor),
             ),
           ),
           Expanded(
@@ -1014,7 +1016,7 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
       ),
@@ -1065,22 +1067,22 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: const Color(0xFFE3F2FD),
-            child: Icon(_activityIcon(a['type']), size: 16, color: const Color(0xFF1565C0)),
+            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            child: Icon(_activityIcon(a['type']), size: 16, color: Theme.of(context).primaryColor),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(a['message'] ?? '', style: const TextStyle(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+            child: Text(a['message'] ?? '', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
           const SizedBox(width: 8),
-          Text(_timeAgo(a['created_at']), style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E))),
+          Text(_timeAgo(a['created_at']), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
         ],
       ),
     )).toList(),

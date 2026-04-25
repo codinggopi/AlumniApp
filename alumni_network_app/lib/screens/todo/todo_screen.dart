@@ -221,14 +221,14 @@ class _TodoScreenState extends State<TodoScreen> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[400]!),
+                    border: Border.all(color: Theme.of(ctx).dividerColor),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.access_time,
-                        color: Color(0xFF1565C0),
+                        color: Theme.of(ctx).primaryColor,
                         size: 20,
                       ),
                       const SizedBox(width: 10),
@@ -238,8 +238,8 @@ class _TodoScreenState extends State<TodoScreen> {
                             : '${picked!.day}/${picked!.month}/${picked!.year}  ${picked!.hour.toString().padLeft(2, '0')}:${picked!.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
                           color: picked == null
-                              ? Colors.grey[600]
-                              : Colors.black87,
+                              ? Theme.of(ctx).textTheme.bodySmall?.color
+                              : Theme.of(ctx).textTheme.bodyMedium?.color,
                           fontSize: 14,
                         ),
                       ),
@@ -247,10 +247,10 @@ class _TodoScreenState extends State<TodoScreen> {
                       if (picked != null)
                         GestureDetector(
                           onTap: () => setSheet(() => picked = null),
-                          child: const Icon(
+                          child: Icon(
                             Icons.close,
                             size: 18,
-                            color: Colors.grey,
+                            color: Theme.of(ctx).iconTheme.color,
                           ),
                         ),
                     ],
@@ -338,7 +338,6 @@ class _TodoScreenState extends State<TodoScreen> {
                     await _save();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565C0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -531,8 +530,6 @@ class _TodoScreenState extends State<TodoScreen> {
         onPressed: () => _addOrEdit(),
         icon: const Icon(Icons.add),
         label: const Text('Add Tasks'),
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
       ),
     );
   }
@@ -559,15 +556,16 @@ class _TodoScreenState extends State<TodoScreen> {
 
   Widget _chip(String label, String value) {
     final selected = _filter == value;
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => setState(() => _filter = value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1565C0) : Colors.white,
+          color: selected ? theme.primaryColor : theme.cardColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF1565C0) : Colors.grey[300]!,
+            color: selected ? theme.primaryColor : theme.dividerColor,
           ),
         ),
         child: Text(
@@ -575,7 +573,7 @@ class _TodoScreenState extends State<TodoScreen> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Colors.grey[700],
+            color: selected ? Colors.white : theme.textTheme.bodyMedium?.color,
           ),
         ),
       ),
@@ -607,6 +605,7 @@ class _TodoCard extends StatelessWidget {
         todo.dueDateTime != null &&
         todo.dueDateTime!.isBefore(DateTime.now()) &&
         !todo.done;
+    final theme = Theme.of(context);
 
     return Dismissible(
       key: Key('todo_${todo.id}'),
@@ -624,7 +623,7 @@ class _TodoCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border(left: BorderSide(color: priorityColor, width: 4)),
           boxShadow: [
@@ -650,7 +649,7 @@ class _TodoCard extends StatelessWidget {
                 border: Border.all(
                   color: todo.done
                       ? const Color(0xFF2E7D32)
-                      : Colors.grey[400]!,
+                      : theme.dividerColor,
                   width: 2,
                 ),
               ),
@@ -665,7 +664,7 @@ class _TodoCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 14,
               decoration: todo.done ? TextDecoration.lineThrough : null,
-              color: todo.done ? Colors.grey[400] : null,
+              color: todo.done ? theme.textTheme.bodySmall?.color : null,
             ),
           ),
           subtitle: Column(
@@ -674,7 +673,7 @@ class _TodoCard extends StatelessWidget {
               if (todo.description != null && todo.description!.isNotEmpty)
                 Text(
                   todo.description!,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -684,14 +683,14 @@ class _TodoCard extends StatelessWidget {
                     Icon(
                       isOverdue ? Icons.warning_amber : Icons.access_time,
                       size: 12,
-                      color: isOverdue ? Colors.red : Colors.grey[500],
+                      color: isOverdue ? Colors.red : theme.textTheme.bodySmall?.color,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       formatDue(todo.dueDateTime!),
                       style: TextStyle(
                         fontSize: 11,
-                        color: isOverdue ? Colors.red : Colors.grey[500],
+                        color: isOverdue ? Colors.red : theme.textTheme.bodySmall?.color,
                         fontWeight: isOverdue
                             ? FontWeight.w700
                             : FontWeight.normal,
@@ -720,7 +719,7 @@ class _TodoCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
+                icon: Icon(Icons.edit_outlined, size: 18, color: theme.iconTheme.color),
                 onPressed: onEdit,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

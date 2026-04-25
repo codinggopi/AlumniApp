@@ -240,7 +240,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           else ...[
             TextButton(
               onPressed: _cancelEdit,
-              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+              child: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
           ],
         ],
@@ -258,11 +258,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
                   child: const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -278,6 +273,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final isStudent = role == 'student';
     final isStaff = role == 'staff';
     final isAlumni = role == 'alumni';
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,29 +284,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 55,
-                backgroundColor: Colors.grey[200],
+                backgroundColor: theme.cardColor,
                 backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
                     ? NetworkImage(avatarUrl.startsWith('http') ? avatarUrl : '${ApiService.baseUrl}$avatarUrl')
                     : null,
                 child: (avatarUrl == null || avatarUrl.isEmpty)
-                    ? const Icon(Icons.person, size: 55, color: Colors.grey)
+                    ? Icon(Icons.person, size: 55, color: theme.iconTheme.color)
                     : null,
               ),
               const SizedBox(height: 14),
               Text(
                 user?.fullName ?? '',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleLarge?.copyWith(fontSize: 22),
               ),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
+                  color: theme.primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   role.toUpperCase(),
-                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
               ),
             ],
@@ -360,11 +356,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         if (user?.bio != null && user!.bio!.isNotEmpty) ...[
           const SizedBox(height: 8),
-          const Text('About', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('About', style: theme.textTheme.titleMedium?.copyWith(fontSize: 16)),
           const SizedBox(height: 8),
           Text(
             user.bio!,
-            style: TextStyle(color: Colors.grey[700], fontSize: 15, height: 1.5),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.5),
           ),
         ],
         const SizedBox(height: 20),
@@ -381,13 +377,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.description, color: Colors.blue[300], size: 22),
+          Icon(Icons.description, color: Theme.of(context).primaryColor, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Resume / CV', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text('Resume / CV', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
                 const SizedBox(height: 2),
                 const Text('Uploaded', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
@@ -397,7 +393,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             onPressed: () => _launchUrl(fullUrl),
             icon: const Icon(Icons.open_in_new, size: 16),
             label: const Text('View'),
-            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).primaryColor),
           ),
         ],
       ),
@@ -422,13 +418,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.blue[300], size: 22),
+          Icon(icon, color: Theme.of(context).primaryColor, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
@@ -445,13 +441,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.email, color: Colors.blue[300], size: 22),
+          Icon(Icons.email, color: Theme.of(context).primaryColor, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Email', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text('Email', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
                 const SizedBox(height: 2),
                 Text(email, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
               ],
@@ -463,7 +459,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             label: const Text('Change', style: TextStyle(fontSize: 13)),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              foregroundColor: Colors.blue,
+              foregroundColor: Theme.of(context).primaryColor,
             ),
           ),
         ],
@@ -582,6 +578,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ── EDIT MODE ──────────────────────────────────────────────────────────────
 
   Widget _buildEditForm(bool isStudent, bool isStaff, bool isAdmin) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         // Avatar picker
@@ -591,7 +588,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 50,
-                backgroundColor: Colors.grey[200],
+                backgroundColor: theme.cardColor,
                 backgroundImage: _localImagePath != null
                     ? FileImage(File(_localImagePath!))
                     : (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
@@ -601,7 +598,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         : null) as ImageProvider?,
                 child: (_localImagePath == null &&
                         (_profilePictureUrl == null || _profilePictureUrl!.isEmpty))
-                    ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                    ? Icon(Icons.person, size: 50, color: theme.iconTheme.color)
                     : null,
               ),
               Positioned(
@@ -609,7 +606,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 right: 0,
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: theme.primaryColor, shape: BoxShape.circle),
                   child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
                 ),
               ),
@@ -623,8 +620,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _localImagePath = null;
               _profilePictureUrl = null;
             }),
-            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-            label: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: 18),
+            label: Text('Remove Photo', style: TextStyle(color: theme.colorScheme.error)),
           ),
         const SizedBox(height: 24),
 
@@ -647,13 +644,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                const Icon(Icons.description, color: Colors.blue),
+                Icon(Icons.description, color: theme.primaryColor),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -669,7 +666,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         _localResumePath != null
                             ? _localResumePath!.split('/').last.split('\\').last
                             : (_resumeUrl != null ? 'Tap View to open' : 'PDF / DOC / DOCX'),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -686,11 +683,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     },
                     icon: const Icon(Icons.open_in_new, size: 16),
                     label: const Text('View'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                    style: TextButton.styleFrom(foregroundColor: theme.primaryColor),
                   ),
                 // Upload button
                 IconButton(
-                  icon: const Icon(Icons.upload_file, color: Colors.blue),
+                  icon: Icon(Icons.upload_file, color: theme.primaryColor),
                   tooltip: 'Upload Resume',
                   onPressed: _pickResume,
                 ),

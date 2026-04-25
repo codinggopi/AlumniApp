@@ -163,11 +163,11 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _slots.isEmpty
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.school_outlined, size: 64, color: Colors.grey),
+              Icon(Icons.school_outlined, size: 64, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
               const SizedBox(height: 16),
-              const Text('No slots yet', style: TextStyle(fontSize: 16, color: Colors.grey)),
+              Text('No slots yet', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 16)),
               const SizedBox(height: 8),
-              const Text('Add your availability so students can book sessions', style: TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
+              Text('Add your availability so students can book sessions', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13), textAlign: TextAlign.center),
             ]))
           : RefreshIndicator(
               onRefresh: _fetch,
@@ -185,20 +185,20 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
                     child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
                     ),
                     child: Row(children: [
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(color: const Color(0xFF2E7D32).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                         child: const Icon(Icons.schedule, color: Color(0xFF2E7D32), size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${s['day']}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                        Text('${s['time_from']} – ${s['time_to']}', style: const TextStyle(fontSize: 13, color: Color(0xFF757575))),
+                        Text('${s['day']}', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
+                        Text('${s['time_from']} – ${s['time_to']}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
                         const SizedBox(height: 4),
                         Row(children: [
                           Icon(Icons.people_outline, size: 14, color: available > 0 ? const Color(0xFF2E7D32) : Colors.red),
@@ -207,15 +207,14 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
                               style: TextStyle(fontSize: 12, color: available > 0 ? const Color(0xFF2E7D32) : Colors.red)),
                           if (booked > 0) ...[
                             const SizedBox(width: 6),
-                            const Text('· tap to view', style: TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
+                            Text('· tap to view', style: TextStyle(fontSize: 11, color: Theme.of(context).primaryColor)),
                           ],
                         ]),
                         const SizedBox(height: 4),
-                        // Meeting link row
                         Row(children: [
                           Icon(Icons.videocam_outlined, size: 14,
                               color: (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
-                                  ? const Color(0xFF1565C0) : Colors.grey[400]),
+                                  ? Theme.of(context).primaryColor : Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
                           const SizedBox(width: 4),
                           Expanded(child: Text(
                             (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
@@ -224,12 +223,12 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
                             style: TextStyle(
                                 fontSize: 11,
                                 color: (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
-                                    ? const Color(0xFF1565C0) : Colors.grey[400]),
+                                    ? Theme.of(context).primaryColor : Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
                             overflow: TextOverflow.ellipsis,
                           )),
                           GestureDetector(
                             onTap: () => _editMeetingLink(s['slot_id'] as int, s['meeting_link'] as String?),
-                            child: const Icon(Icons.edit, size: 14, color: Color(0xFF9E9E9E)),
+                            child: Icon(Icons.edit, size: 14, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.5)),
                           ),
                         ]),
                         const SizedBox(height: 6),
@@ -237,7 +236,7 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: s['max_students'] > 0 ? booked / s['max_students'] : 0,
-                            backgroundColor: const Color(0xFFE8F5E9),
+                            backgroundColor: const Color(0xFF2E7D32).withValues(alpha: 0.1),
                             color: const Color(0xFF2E7D32),
                             minHeight: 5,
                           ),
@@ -307,7 +306,7 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
           title: const Text('Add Meeting Link'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Add a meeting link so the student can join the session.',
-                style: TextStyle(fontSize: 13, color: Colors.grey)),
+                style: TextStyle(fontSize: 13)),
             const SizedBox(height: 12),
             TextField(
               controller: ctrl,
@@ -364,7 +363,7 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
         Container(
           margin: const EdgeInsets.symmetric(vertical: 10),
           width: 40, height: 4,
-          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2)),
         ),
         // Header
         Padding(
@@ -372,15 +371,15 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${widget.slot['day']}  ${widget.slot['time_from']} – ${widget.slot['time_to']}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 16)),
               const SizedBox(height: 2),
               Text('$booked / $max students joined',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF757575))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
             ])),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text('$booked joined',
@@ -394,11 +393,11 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _students.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(Icons.people_outline, size: 48, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text('No students yet', style: TextStyle(color: Colors.grey)),
+                        Icon(Icons.people_outline, size: 48, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
+                        const SizedBox(height: 10),
+                        Text('No students yet', style: Theme.of(context).textTheme.bodySmall),
                       ]),
                     )
                   : ListView.separated(
@@ -421,7 +420,7 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
                         return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
                           ),
@@ -429,21 +428,21 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
                             Row(children: [
                               CircleAvatar(
                                 radius: 22,
-                                backgroundColor: const Color(0xFFE3F2FD),
+                                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                 backgroundImage: (s['student_picture'] != null && s['student_picture'].toString().isNotEmpty)
                                     ? NetworkImage(s['student_picture'].toString().startsWith('http')
                                         ? s['student_picture']
                                         : '${ApiService.baseUrl}${s['student_picture']}')
                                     : null,
                                 child: (s['student_picture'] == null || s['student_picture'].toString().isEmpty)
-                                    ? const Icon(Icons.person, color: Color(0xFF1565C0)) : null,
+                                    ? Icon(Icons.person, color: Theme.of(context).primaryColor) : null,
                               ),
                               const SizedBox(width: 12),
                               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(s['student_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                                Text(s['student_email'] ?? '', style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
+                                Text(s['student_name'] ?? '', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
+                                Text(s['student_email'] ?? '', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
                                 if (s['student_department'] != null)
-                                  Text(s['student_department'], style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+                                  Text(s['student_department'], style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
                               ])),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

@@ -69,14 +69,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+            colors: [theme.primaryColor, theme.colorScheme.primary.withValues(alpha: 0.8)],
           ),
         ),
         child: Column(
@@ -86,10 +87,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               position: _slideAnimation,
               child: FadeTransition(
                 opacity: _fadeAnimation,
-                child: const CircleAvatar(
+                child: CircleAvatar(
                   radius: 60,
                   backgroundColor: Colors.white,
-                  child: Icon(Icons.school, size: 60, color: Color(0xFF2196F3)),
+                  child: Icon(Icons.school, size: 60, color: theme.primaryColor),
                 ),
               ),
             ),

@@ -111,7 +111,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
     padding: const EdgeInsets.only(bottom: 10),
     child: Row(
       children: [
-        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
+        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15, fontWeight: FontWeight.w700)),
         const Spacer(),
         if (trailing != null) trailing,
       ],
@@ -154,8 +154,9 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
   }
 
   Widget _buildStatsRow(Map stats) {
+    final theme = Theme.of(context);
     final items = [
-      {'icon': Icons.work, 'label': 'Posted', 'value': '${stats['internships_posted'] ?? 0}', 'color': const Color(0xFF1565C0)},
+      {'icon': Icons.work, 'label': 'Posted', 'value': '${stats['internships_posted'] ?? 0}', 'color': theme.primaryColor},
       {'icon': Icons.people, 'label': 'Connected', 'value': '${stats['students_connected'] ?? 0}', 'color': const Color(0xFF00897B)},
       {'icon': Icons.chat_bubble, 'label': 'Unread', 'value': '${stats['unread_messages'] ?? 0}', 'color': const Color(0xFFAD1457)},
       {'icon': Icons.inbox, 'label': 'Applicants', 'value': '${stats['new_applicants'] ?? 0}', 'color': const Color(0xFFF57C00)},
@@ -166,7 +167,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
           margin: const EdgeInsets.symmetric(horizontal: 3),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
           ),
@@ -174,7 +175,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
             Icon(item['icon'] as IconData, color: item['color'] as Color, size: 20),
             const SizedBox(height: 4),
             Text(item['value'] as String, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: item['color'] as Color)),
-            Text(item['label'] as String, style: const TextStyle(fontSize: 9, color: Color(0xFF9E9E9E))),
+            Text(item['label'] as String, style: theme.textTheme.bodySmall?.copyWith(fontSize: 9)),
           ]),
         ),
       )).toList(),
@@ -184,7 +185,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
   Widget _buildPointsBadges(int points, List badges) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       borderRadius: BorderRadius.circular(14),
       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
     ),
@@ -192,11 +193,11 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          const Text('⭐ My Points & Badges', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          Text('⭐ My Points & Badges', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
           const Spacer(),
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlumniLeaderboardScreen())),
-            child: const Text('Leaderboard →', style: TextStyle(color: Color(0xFF1565C0), fontSize: 12, fontWeight: FontWeight.w600)),
+            child: Text('Leaderboard →', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ]),
         const SizedBox(height: 10),
@@ -213,12 +214,11 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
           const SizedBox(width: 12),
           Expanded(
             child: badges.isEmpty
-                ? const Text('Complete actions to earn badges!', style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)))
+                ? Text('Complete actions to earn badges!', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12))
                 : Wrap(
                     spacing: 8,
                     children: badges.map<Widget>((b) => Chip(
                       label: Text('${b['icon']} ${b['name']}', style: const TextStyle(fontSize: 11)),
-                      backgroundColor: const Color(0xFFE3F2FD),
                       padding: EdgeInsets.zero,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     )).toList(),
@@ -236,25 +236,25 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
         ),
         child: Row(children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: const Color(0xFFE3F2FD),
+            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
             backgroundImage: (s['profile_picture_url'] != null && s['profile_picture_url'].toString().isNotEmpty)
                 ? NetworkImage(s['profile_picture_url'].toString().startsWith('http')
                     ? s['profile_picture_url'] : '${ApiService.baseUrl}${s['profile_picture_url']}')
                 : null,
             child: (s['profile_picture_url'] == null || s['profile_picture_url'].toString().isEmpty)
-                ? const Icon(Icons.person, size: 20, color: Color(0xFF1565C0)) : null,
+                ? Icon(Icons.person, size: 20, color: Theme.of(context).primaryColor) : null,
           ),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s['full_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            Text(s['department'] ?? 'Student', style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+            Text(s['full_name'] ?? '', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(s['department'] ?? 'Student', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
           ])),
           Row(children: [
             _actionBtn('Accept', const Color(0xFF2E7D32), () => _respond(r['connection_id'], 'accepted')),
@@ -292,20 +292,20 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFF00897B).withValues(alpha: 0.3)),
           ),
           child: Row(children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: const Color(0xFF00897B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
               child: const Icon(Icons.add, color: Color(0xFF00897B), size: 22),
             ),
             const SizedBox(width: 14),
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('No slots added yet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              Text('Tap to add your availability for students', style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E))),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('No slots added yet', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 14)),
+              Text('Tap to add your availability for students', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
             ])),
             const Icon(Icons.chevron_right, color: Color(0xFF00897B)),
           ]),
@@ -324,7 +324,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
           ),
@@ -332,7 +332,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: available > 0 ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                color: available > 0 ? const Color(0xFF2E7D32).withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(Icons.schedule,
@@ -341,14 +341,14 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${s['day']}  ${s['time_from']} – ${s['time_to']}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 4),
               Row(children: [
                 Expanded(child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: fillRatio.toDouble(),
-                    backgroundColor: const Color(0xFFE8F5E9),
+                    backgroundColor: const Color(0xFF2E7D32).withValues(alpha: 0.1),
                     color: available > 0 ? const Color(0xFF2E7D32) : Colors.red,
                     minHeight: 5,
                   ),
@@ -361,7 +361,7 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
                         color: available > 0 ? const Color(0xFF2E7D32) : Colors.red)),
               ]),
               Text(available > 0 ? '$available slot${available > 1 ? 's' : ''} available' : 'Fully booked',
-                  style: TextStyle(fontSize: 11, color: available > 0 ? const Color(0xFF9E9E9E) : Colors.red)),
+                  style: TextStyle(fontSize: 11, color: available > 0 ? Theme.of(context).textTheme.bodySmall?.color : Colors.red)),
             ])),
           ]),
         );
@@ -373,17 +373,17 @@ class _AlumniDashboardState extends State<AlumniDashboard> {
     children: activity.map((a) => Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(12)),
       child: Row(children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: const Color(0xFFE8F5E9),
+          backgroundColor: const Color(0xFF00897B).withValues(alpha: 0.1),
           child: Icon(_actIcon(a['type']), size: 16, color: const Color(0xFF00897B)),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(a['message'] ?? '', style: const TextStyle(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis)),
+        Expanded(child: Text(a['message'] ?? '', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis)),
         const SizedBox(width: 8),
-        Text(_timeAgo(a['created_at']), style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E))),
+        Text(_timeAgo(a['created_at']), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
       ]),
     )).toList(),
   );

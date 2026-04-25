@@ -149,8 +149,8 @@ class _EventsListScreenState extends State<EventsListScreen> {
                           ? Icons.event
                           : Icons.announcement,
                       color: event.category == 'event'
-                          ? Colors.blue
-                          : Colors.orange,
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.tertiary,
                     ),
                     title: Text(
                       event.title,
@@ -181,13 +181,13 @@ class _EventsListScreenState extends State<EventsListScreen> {
                           Icon(
                             Icons.attachment,
                             size: 20,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).iconTheme.color,
                           ),
                         if (event.hasPhotos)
                           Icon(
                             Icons.insert_photo,
                             size: 20,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).iconTheme.color,
                           ),
                         const Icon(Icons.chevron_right),
                       ],
@@ -218,8 +218,7 @@ class _EventsListScreenState extends State<EventsListScreen> {
                 );
                 if (result == true) _fetchEvents();
               },
-              backgroundColor: Colors.blue,
-              child: const Icon(Icons.add, color: Colors.white),
+              child: const Icon(Icons.add),
             )
           : null,
     );

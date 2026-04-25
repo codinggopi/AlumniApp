@@ -120,11 +120,11 @@ class _StudentMentorshipScreenState extends State<StudentMentorshipScreen>
   Widget _buildAvailableTab() {
     if (_loadingAvailable) return const Center(child: CircularProgressIndicator());
     if (_available.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.school_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 12),
-          Text('No mentorship slots available yet', style: TextStyle(color: Colors.grey, fontSize: 15)),
+          Icon(Icons.school_outlined, size: 64, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
+          const SizedBox(height: 12),
+          Text('No mentorship slots available yet', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15)),
         ]),
       );
     }
@@ -144,13 +144,13 @@ class _StudentMentorshipScreenState extends State<StudentMentorshipScreen>
   Widget _buildMyBookingsTab() {
     if (_loadingBookings) return const Center(child: CircularProgressIndicator());
     if (_myBookings.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.event_busy_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 12),
-          Text('No bookings yet', style: TextStyle(color: Colors.grey, fontSize: 15)),
-          SizedBox(height: 6),
-          Text('Browse available slots and join a session', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          Icon(Icons.event_busy_outlined, size: 64, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
+          const SizedBox(height: 12),
+          Text('No bookings yet', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 15)),
+          const SizedBox(height: 6),
+          Text('Browse available slots and join a session', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13)),
         ]),
       );
     }
@@ -178,12 +178,13 @@ class _SlotCard extends StatelessWidget {
     final available = slot['available'] as int;
     final alreadyBooked = slot['already_booked'] as bool;
     final isFull = available <= 0;
+    final theme = Theme.of(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
       ),
@@ -192,7 +193,7 @@ class _SlotCard extends StatelessWidget {
         Row(children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFFE8F5E9),
+            backgroundColor: const Color(0xFF00897B).withValues(alpha: 0.1),
             backgroundImage: (slot['alumni_picture'] != null && slot['alumni_picture'].toString().isNotEmpty)
                 ? NetworkImage(slot['alumni_picture'].toString().startsWith('http')
                     ? slot['alumni_picture']
@@ -203,19 +204,18 @@ class _SlotCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(slot['alumni_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            Text(slot['alumni_name'] ?? '', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
             if (slot['alumni_job_title'] != null || slot['alumni_company'] != null)
               Text(
                 [slot['alumni_job_title'], slot['alumni_company']].where((v) => v != null).join(' @ '),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF757575)),
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
                 overflow: TextOverflow.ellipsis,
               ),
           ])),
-          // availability badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: isFull ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9),
+              color: isFull ? Colors.red.withValues(alpha: 0.1) : const Color(0xFF2E7D32).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -229,36 +229,39 @@ class _SlotCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 12),
-        // Slot time info
         Row(children: [
-          const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF757575)),
+          Icon(Icons.calendar_today_outlined, size: 14, color: theme.iconTheme.color?.withValues(alpha: 0.6)),
           const SizedBox(width: 6),
-          Text(slot['day'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(slot['day'] ?? '', style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(width: 16),
-          const Icon(Icons.access_time_outlined, size: 14, color: Color(0xFF757575)),
+          Icon(Icons.access_time_outlined, size: 14, color: theme.iconTheme.color?.withValues(alpha: 0.6)),
           const SizedBox(width: 6),
-          Text('${slot['time_from']} – ${slot['time_to']}', style: const TextStyle(fontSize: 13)),
+          Text('${slot['time_from']} – ${slot['time_to']}', style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13)),
         ]),
         const SizedBox(height: 6),
-        // Progress bar
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: slot['max_students'] > 0 ? slot['booked'] / slot['max_students'] : 0,
-            backgroundColor: const Color(0xFFE8F5E9),
+            backgroundColor: const Color(0xFF00897B).withValues(alpha: 0.1),
             color: isFull ? Colors.red : const Color(0xFF00897B),
             minHeight: 5,
           ),
         ),
         const SizedBox(height: 12),
-        // Join button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
             onPressed: (isFull || alreadyBooked) ? null : onJoin,
             style: ElevatedButton.styleFrom(
-              backgroundColor: alreadyBooked ? Colors.grey[300] : const Color(0xFF00897B),
-              foregroundColor: alreadyBooked ? Colors.grey[600] : Colors.white,
+              backgroundColor: alreadyBooked
+                  ? theme.dividerColor
+                  : isFull
+                      ? theme.dividerColor
+                      : const Color(0xFF00897B),
+              foregroundColor: alreadyBooked || isFull
+                  ? theme.textTheme.bodySmall?.color
+                  : Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(alreadyBooked ? 'Already Joined' : isFull ? 'Slot Full' : 'Join Session'),
@@ -340,7 +343,7 @@ class _BookingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: live ? Border.all(color: const Color(0xFF2E7D32), width: 2) : null,
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
@@ -349,7 +352,7 @@ class _BookingCard extends StatelessWidget {
         Row(children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFFE8F5E9),
+            backgroundColor: const Color(0xFF00897B).withValues(alpha: 0.1),
             backgroundImage: (booking['alumni_picture'] != null && booking['alumni_picture'].toString().isNotEmpty)
                 ? NetworkImage(booking['alumni_picture'].toString().startsWith('http')
                     ? booking['alumni_picture']
@@ -360,25 +363,25 @@ class _BookingCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(booking['alumni_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            Text(booking['alumni_name'] ?? '', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 14)),
             if (booking['alumni_job_title'] != null || booking['alumni_company'] != null)
               Text(
                 [booking['alumni_job_title'], booking['alumni_company']].where((v) => v != null).join(' @ '),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF757575)),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
                 overflow: TextOverflow.ellipsis,
               ),
             const SizedBox(height: 4),
             Row(children: [
-              const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF9E9E9E)),
+              Icon(Icons.calendar_today_outlined, size: 12, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Text('$day  $timeFrom – $timeTo',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12)),
             ]),
             if (timeLabel != null) ...[
               const SizedBox(height: 2),
               Text(timeLabel,
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                      color: live ? const Color(0xFF2E7D32) : const Color(0xFF9E9E9E))),
+                      color: live ? const Color(0xFF2E7D32) : Theme.of(context).textTheme.bodySmall?.color)),
             ],
           ])),
           Container(
@@ -400,7 +403,7 @@ class _BookingCard extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(color: const Color(0xFFFFF8E1), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: const Color(0xFFF57C00).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
             child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(Icons.hourglass_empty, size: 16, color: Color(0xFFF57C00)),
               SizedBox(width: 6),
@@ -411,7 +414,7 @@ class _BookingCard extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
             child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
               SizedBox(width: 6),
@@ -430,7 +433,7 @@ class _BookingCard extends StatelessWidget {
               label: Text(live ? 'Join Now 🔴' : 'Open Meeting Link',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: live ? const Color(0xFF2E7D32) : const Color(0xFF1565C0),
+                backgroundColor: live ? const Color(0xFF2E7D32) : Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -440,7 +443,7 @@ class _BookingCard extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: const Color(0xFF2E7D32).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
             child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF2E7D32)),
               SizedBox(width: 6),

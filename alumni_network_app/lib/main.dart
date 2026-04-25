@@ -67,15 +67,28 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Inter',
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1565C0),
+          seedColor: const Color(0xFF2F5BFF),
           brightness: Brightness.light,
         ),
+        primaryColor: const Color(0xFF2F5BFF),
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+        cardColor: const Color(0xFFFFFFFF),
+        dividerColor: const Color(0xFFE0E0E0),
+        iconTheme: const IconThemeData(color: Color(0xFF424242)),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFF1A1A2E)),
+          bodyMedium: TextStyle(color: Color(0xFF424242)),
+          bodySmall: TextStyle(color: Color(0xFF757575)),
+          titleLarge: TextStyle(color: Color(0xFF1A1A2E), fontWeight: FontWeight.w700),
+          titleMedium: TextStyle(color: Color(0xFF1A1A2E), fontWeight: FontWeight.w600),
+          titleSmall: TextStyle(color: Color(0xFF424242), fontWeight: FontWeight.w500),
+        ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
+          backgroundColor: Color(0xFFFFFFFF),
           foregroundColor: Color(0xFF1A1A2E),
           elevation: 0,
           centerTitle: false,
+          iconTheme: IconThemeData(color: Color(0xFF1A1A2E)),
           titleTextStyle: TextStyle(
             fontFamily: 'Inter',
             fontSize: 18,
@@ -85,13 +98,16 @@ class MyApp extends StatelessWidget {
         ),
         cardTheme: CardThemeData(
           elevation: 0,
-          color: Colors.white,
+          color: const Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           margin: EdgeInsets.zero,
         ),
+        drawerTheme: const DrawerThemeData(
+          backgroundColor: Color(0xFFFFFFFF),
+        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1565C0),
+            backgroundColor: const Color(0xFF2F5BFF),
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -111,18 +127,29 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+            borderSide: const BorderSide(color: Color(0xFF2F5BFF), width: 2),
           ),
+          labelStyle: const TextStyle(color: Color(0xFF757575)),
+          hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.white,
-          selectedItemColor: Color(0xFF1565C0),
+          backgroundColor: Color(0xFFFFFFFF),
+          selectedItemColor: Color(0xFF2F5BFF),
           unselectedItemColor: Color(0xFF9E9E9E),
           elevation: 8,
           type: BottomNavigationBarType.fixed,
           selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
           unselectedLabelStyle: TextStyle(fontSize: 11),
+        ),
+        listTileTheme: const ListTileThemeData(
+          textColor: Color(0xFF1A1A2E),
+          iconColor: Color(0xFF424242),
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: const Color(0xFFF5F7FA),
+          labelStyle: const TextStyle(color: Color(0xFF424242)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       ),
       darkTheme: ThemeData(
@@ -130,31 +157,47 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Inter',
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1565C0),
+          seedColor: const Color(0xFF3B82F6),
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFF3B82F6),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardColor: const Color(0xFF1E293B),
+        dividerColor: const Color(0xFF334155),
+        iconTheme: const IconThemeData(color: Color(0xFFCBD5E1)),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFFF1F5F9)),
+          bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
+          bodySmall: TextStyle(color: Color(0xFF94A3B8)),
+          titleLarge: TextStyle(color: Color(0xFFF1F5F9), fontWeight: FontWeight.w700),
+          titleMedium: TextStyle(color: Color(0xFFF1F5F9), fontWeight: FontWeight.w600),
+          titleSmall: TextStyle(color: Color(0xFFCBD5E1), fontWeight: FontWeight.w500),
+        ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E1E1E),
-          foregroundColor: Colors.white,
+          backgroundColor: Color(0xFF1E293B),
+          foregroundColor: Color(0xFFF1F5F9),
           elevation: 0,
           centerTitle: false,
+          iconTheme: IconThemeData(color: Color(0xFFF1F5F9)),
           titleTextStyle: TextStyle(
             fontFamily: 'Inter',
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: Color(0xFFF1F5F9),
           ),
         ),
         cardTheme: CardThemeData(
           elevation: 0,
-          color: const Color(0xFF1E1E1E),
+          color: const Color(0xFF1E293B),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           margin: EdgeInsets.zero,
         ),
+        drawerTheme: const DrawerThemeData(
+          backgroundColor: Color(0xFF1E293B),
+        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1565C0),
+            backgroundColor: const Color(0xFF3B82F6),
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -163,29 +206,40 @@ class MyApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFF2A2A2A),
+          fillColor: const Color(0xFF0F172A),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+            borderSide: const BorderSide(color: Color(0xFF334155)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+            borderSide: const BorderSide(color: Color(0xFF334155)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+            borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
           ),
+          labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+          hintStyle: const TextStyle(color: Color(0xFF64748B)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF1E1E1E),
-          selectedItemColor: Color(0xFF64B5F6),
-          unselectedItemColor: Color(0xFF757575),
+          backgroundColor: Color(0xFF1E293B),
+          selectedItemColor: Color(0xFF3B82F6),
+          unselectedItemColor: Color(0xFF64748B),
           elevation: 8,
           type: BottomNavigationBarType.fixed,
           selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
           unselectedLabelStyle: TextStyle(fontSize: 11),
+        ),
+        listTileTheme: const ListTileThemeData(
+          textColor: Color(0xFFF1F5F9),
+          iconColor: Color(0xFFCBD5E1),
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: const Color(0xFF334155),
+          labelStyle: const TextStyle(color: Color(0xFFCBD5E1)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       ),
       home: const AuthWrapper(),
@@ -275,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -287,8 +341,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: const Color(0xFF1565C0),
-          unselectedItemColor: const Color(0xFF9E9E9E),
+          selectedItemColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+          unselectedItemColor: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedFontSize: 11,
@@ -502,7 +556,7 @@ class _DashboardViewState extends State<DashboardView> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: _buildSideDrawer(context, user, role, availableActions, auth),
       appBar: AppBar(
         title: Column(
@@ -510,7 +564,7 @@ class _DashboardViewState extends State<DashboardView> {
           children: [
             Text(
               'Good ${_greeting()},',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w400),
+              style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodySmall?.color, fontWeight: FontWeight.w400),
             ),
             user == null
                 ? const SizedBox(
@@ -519,11 +573,11 @@ class _DashboardViewState extends State<DashboardView> {
                   )
                 : Text(
                     (user.fullName).split(' ').first,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.titleLarge?.color),
                   ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         actions: [
           Consumer<ThemeProvider>(
@@ -558,7 +612,7 @@ class _DashboardViewState extends State<DashboardView> {
             ),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Color(0xFF1A1A2E)),
+            icon: Icon(Icons.more_vert, color: Theme.of(context).iconTheme.color),
             onSelected: (val) {
               if (val == 'refresh') _handleRefresh(context, auth);
               if (val == 'logout') _handleLogout(context, auth);
@@ -987,7 +1041,7 @@ class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
         ),
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
@@ -1031,7 +1085,7 @@ class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
       children: [
         Row(
           children: [
-            const Text('Platform Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
+            const Text('Platform Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const Spacer(),
             IconButton(
               icon: _loading
@@ -1058,7 +1112,7 @@ class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
             return Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -1090,7 +1144,7 @@ class _AdminStatsWidgetState extends State<_AdminStatsWidget> {
                         ),
                         Text(
                           item.label,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w500),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -1208,7 +1262,7 @@ class _SideDrawerState extends State<_SideDrawer> {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).drawerTheme.backgroundColor,
       child: SafeArea(
         child: Column(
           children: [
@@ -1272,7 +1326,7 @@ class _SideDrawerState extends State<_SideDrawer> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
               child: Row(
                 children: [
-                  const Text('Quick Actions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF9E9E9E), letterSpacing: 0.5)),
+                  Text('Quick Actions', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
                   const Spacer(),
                   if (!_isReordering)
                     GestureDetector(
@@ -1280,15 +1334,15 @@ class _SideDrawerState extends State<_SideDrawer> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE3F2FD),
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.tune, size: 13, color: Color(0xFF1565C0)),
-                            SizedBox(width: 4),
-                            Text('Arrange', style: TextStyle(fontSize: 11, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                            Icon(Icons.tune, size: 13, color: Theme.of(context).primaryColor),
+                            const SizedBox(width: 4),
+                            Text('Arrange', style: TextStyle(fontSize: 11, color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -1301,12 +1355,12 @@ class _SideDrawerState extends State<_SideDrawer> {
                             _actions = List.from(widget.actions);
                             _isReordering = false;
                           }),
-                          child: const Text('Cancel', style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
+                          child: Text('Cancel', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w600)),
                         ),
                         const SizedBox(width: 12),
                         GestureDetector(
                           onTap: _saveOrder,
-                          child: const Text('Save', style: TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w700)),
+                          child: Text('Save', style: TextStyle(fontSize: 12, color: Theme.of(context).primaryColor, fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),
@@ -1332,7 +1386,7 @@ class _SideDrawerState extends State<_SideDrawer> {
                           key: ValueKey(action.id),
                           margin: const EdgeInsets.only(bottom: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F7FA),
+                            color: Theme.of(context).scaffoldBackgroundColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ListTile(
@@ -1344,8 +1398,8 @@ class _SideDrawerState extends State<_SideDrawer> {
                               ),
                               child: Icon(action.icon, color: action.color, size: 18),
                             ),
-                            title: Text(action.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                            trailing: Icon(Icons.drag_handle, color: Colors.grey[400]),
+                            title: Text(action.title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w500)),
+                            trailing: Icon(Icons.drag_handle, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
                           ),
                         );
                       },
@@ -1469,10 +1523,10 @@ class _DrawerActionTileState extends State<_DrawerActionTile> {
             style: TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 14,
-              color: _hovered ? widget.action.color : const Color(0xFF1A1A2E),
+              color: _hovered ? widget.action.color : Theme.of(context).textTheme.bodyMedium?.color,
             ),
           ),
-          trailing: Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
+          trailing: Icon(Icons.chevron_right, size: 18, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
           onTap: () {
             Navigator.pop(context); // close drawer
             widget.action.onTap();

@@ -193,7 +193,7 @@ class _SubmitFeedbackTabState extends State<_SubmitFeedbackTab> {
         Container(
           constraints: const BoxConstraints(maxHeight: 220),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: Theme.of(context).dividerColor),
             borderRadius: BorderRadius.circular(12),
           ),
           child: _filtered.isEmpty
@@ -228,7 +228,7 @@ class _SubmitFeedbackTabState extends State<_SubmitFeedbackTab> {
                       ),
                       title: Text(t['full_name'] ?? '',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500,
-                              color: isLocked ? Colors.grey[400] : null)),
+                              color: isLocked ? Theme.of(context).textTheme.bodySmall?.color : null)),
                       trailing: isLocked
                           ? Row(mainAxisSize: MainAxisSize.min, children: [
                               const Icon(Icons.lock, size: 15, color: Colors.orange),
@@ -333,18 +333,19 @@ class _SubmitFeedbackTabState extends State<_SubmitFeedbackTab> {
 
   Widget _filterChip(String label, String value) {
     final selected = _roleFilter == value;
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () => _applyFilter(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF7B1FA2) : Colors.white,
+          color: selected ? const Color(0xFF7B1FA2) : theme.cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? const Color(0xFF7B1FA2) : Colors.grey[300]!),
+          border: Border.all(color: selected ? const Color(0xFF7B1FA2) : theme.dividerColor),
         ),
         child: Text(label,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : Colors.grey[700])),
+                color: selected ? Colors.white : theme.textTheme.bodyMedium?.color)),
       ),
     );
   }
@@ -612,12 +613,13 @@ class _FeedbackCard extends StatelessWidget {
     final rating = item['rating'] as int;
     final adminResponse = item['admin_response'] as String?;
     final targetRole = item['target_role'] as String? ?? '';
+    final theme = Theme.of(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -633,17 +635,15 @@ class _FeedbackCard extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(item['student_name'] ?? '',
-                  style: const TextStyle(
+                  style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700, fontSize: 14)),
               if (item['student_department'] != null)
                 Text(item['student_department'],
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF9E9E9E))),
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
             ]),
           ),
           Text(_timeAgo(item['created_at']),
-              style:
-                  const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
         ]),
         // Target row (shown for admin / student sent view)
         if (showTarget && item['target_name'] != null) ...[
@@ -686,9 +686,8 @@ class _FeedbackCard extends StatelessWidget {
             item['message'].toString().isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(item['message'],
-              style: const TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 13,
-                  color: Color(0xFF424242),
                   height: 1.4)),
         ],
         // Admin response

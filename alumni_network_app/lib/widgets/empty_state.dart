@@ -16,6 +16,7 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -25,34 +26,26 @@ class EmptyStateWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 80,
-                color: Colors.blue[700],
+                color: theme.colorScheme.primary,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+              style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                height: 1.5,
-              ),
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 32),
@@ -61,8 +54,6 @@ class EmptyStateWidget extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Try Again'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

@@ -156,8 +156,8 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
         actions: [
           TextButton.icon(
             onPressed: _isSubmitting ? null : _addEntry,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Add More', style: TextStyle(color: Colors.white)),
+            icon: const Icon(Icons.add),
+            label: const Text('Add More'),
           ),
         ],
       ),
@@ -186,11 +186,6 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
                             : 'SHARE ALL ${_entries.length} RESOURCES',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
                     ),
                   ),
           ),
@@ -201,6 +196,7 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
 
   Widget _buildEntryCard(int index) {
     final e = _entries[index];
+    final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -215,7 +211,7 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
               children: [
                 CircleAvatar(
                   radius: 14,
-                  backgroundColor: e.isDone ? Colors.green : Colors.blue,
+                  backgroundColor: e.isDone ? Colors.green : theme.primaryColor,
                   child: e.isUploading
                       ? const SizedBox(
                           width: 16,
@@ -315,12 +311,12 @@ class _UploadResourceScreenState extends State<UploadResourceScreen> {
                   padding: const EdgeInsets.only(top: 6),
                   child: Row(
                     children: [
-                      const Icon(Icons.insert_drive_file, size: 16, color: Colors.blue),
+                      Icon(Icons.insert_drive_file, size: 16, color: theme.primaryColor),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           e.pickedDocumentName!,
-                          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w500, fontSize: 13),
+                          style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.w500, fontSize: 13),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),

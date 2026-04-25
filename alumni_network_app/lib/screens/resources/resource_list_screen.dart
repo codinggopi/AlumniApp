@@ -108,11 +108,11 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.library_books_outlined, size: 80, color: Colors.grey[400]),
+                      Icon(Icons.library_books_outlined, size: 80, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
                       const SizedBox(height: 16),
                       Text(
                         'No resources available yet',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 18),
                       ),
                     ],
                   ),
@@ -135,12 +135,12 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: (isDocument ? Colors.orange : Colors.blue).withValues(alpha: 0.1),
+                              color: (isDocument ? Colors.orange : Theme.of(context).primaryColor).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               isDocument ? Icons.description : Icons.link,
-                              color: isDocument ? Colors.orange : Colors.blue,
+                              color: isDocument ? Colors.orange : Theme.of(context).primaryColor,
                             ),
                           ),
                           title: Text(
@@ -158,18 +158,18 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                               const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                                  Icon(Icons.people_outline, size: 14, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.6)),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Target: ${res.targetAudience.toUpperCase()}',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
                                   ),
                                   const SizedBox(width: 12),
-                                  Icon(Icons.open_in_new, size: 14, color: Colors.blue[400]),
+                                  Icon(Icons.open_in_new, size: 14, color: Theme.of(context).primaryColor),
                                   const SizedBox(width: 4),
                                   Text(
                                     isDocument ? 'Tap to open' : 'Tap to visit',
-                                    style: TextStyle(fontSize: 12, color: Colors.blue[400]),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12, color: Theme.of(context).primaryColor),
                                   ),
                                 ],
                               ),
@@ -180,7 +180,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                                   onPressed: () => _deleteResource(res.resourceId),
                                 )
-                              : Icon(Icons.open_in_new, color: Colors.blue[400]),
+                              : Icon(Icons.open_in_new, color: Theme.of(context).primaryColor),
                           onTap: () => _launchURL(res.url),
                         ),
                       );

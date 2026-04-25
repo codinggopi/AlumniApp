@@ -360,26 +360,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Register User',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Register User'),
       ),
       extendBodyBehindAppBar: true,
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.bottomLeft,
             end: Alignment.topRight,
-            colors: [Colors.indigo, Colors.blueAccent],
+            colors: [theme.colorScheme.secondary, theme.primaryColor],
           ),
         ),
         child: Center(
@@ -396,18 +394,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.person_add,
                         size: 50,
-                        color: Colors.blueAccent,
+                        color: theme.primaryColor,
                       ),
                       const SizedBox(height: 10),
-                      const Text(
+                      Text(
                         'Join the Network',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: theme.textTheme.titleLarge?.copyWith(fontSize: 22),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -476,13 +471,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   height: 50,
                                   child: ElevatedButton(
                                     onPressed: _handleRegister,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                    ),
                                     child: const Text(
                                       'REGISTER NOW',
                                       style: TextStyle(
@@ -492,19 +480,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                const Row(
+                                Row(
                                   children: [
-                                    Expanded(child: Divider()),
+                                    const Expanded(child: Divider()),
                                     Padding(
-                                      padding: EdgeInsets.symmetric(
+                                      padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                       ),
                                       child: Text(
                                         'OR',
-                                        style: TextStyle(color: Colors.grey),
+                                        style: theme.textTheme.bodySmall,
                                       ),
                                     ),
-                                    Expanded(child: Divider()),
+                                    const Expanded(child: Divider()),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
@@ -518,9 +506,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       'BULK UPLOAD (CSV / Excel)',
                                     ),
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.blueAccent,
-                                      side: const BorderSide(
-                                        color: Colors.blueAccent,
+                                      foregroundColor: theme.primaryColor,
+                                      side: BorderSide(
+                                        color: theme.primaryColor,
                                       ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(15),
@@ -529,18 +517,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                const Text(
+                                Text(
                                   'Required: full_name, email, password, role\nOptional: phone, department, graduation_year, city, company, job_title',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                  ),
+                                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                                 ),
                               ],
                             ),
-                      //const SizedBox(height: 20),
-                      //
                     ],
                   ),
                 ),
