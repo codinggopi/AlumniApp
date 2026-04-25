@@ -389,7 +389,7 @@ def serialize_student(user: models.User, profile: models.StudentProfile):
     data = serialize_user(user)
     data.update(
         {
-            "skills": profile.educational_details,
+            "skills": profile.skills,
             "interests": profile.interests,
             "resume_url": profile.resume_url,
             "educational_details": profile.educational_details,
@@ -2841,17 +2841,26 @@ def get_my_bookings(
 def _award_points(db, alumni_id: int, action: str, pts: int):
     row = db.query(models.AlumniPoints).filter(models.AlumniPoints.alumni_id == alumni_id).first()
     if not row:
-        row = models.AlumniPoints(alumni_id=alumni_id, points=0)
+        row = models.AlumniPoints(
+            alumni_id=alumni_id,
+            points=0,
+            internships_posted=0,
+            questions_answered=0,
+            mentorships_completed=0,
+            students_connected=0,
+        )
         db.add(row)
-    row.points += pts
+    # Ensure no None values before incrementing
+    row.points = (row.points or 0) + pts
     if action == "internship":
-        row.internships_posted += 1
+        row.internships_posted = (row.internships_posted or 0) + 1
     elif action == "answer":
-        row.questions_answered += 1
+        row.questions_answered = (row.questions_answered or 0) + 1
     elif action == "mentorship":
-        row.mentorships_completed += 1
+        row.mentorships_completed = (row.mentorships_completed or 0) + 1
     elif action == "connection":
-        row.students_connected += 1
+        row.students_connected = (row.students_connected or 0) + 1
+    db.commit()
 
 
 @app.get("/alumni/leaderboard", tags=["alumni"])

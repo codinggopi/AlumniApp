@@ -84,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailController.text,
       _passwordController.text,
       _selectedRole!,
+      rememberMe: _rememberMe,
     );
 
     if (dialogOpen) {

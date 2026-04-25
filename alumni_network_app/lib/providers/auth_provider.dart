@@ -14,7 +14,7 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _user != null;
 
   /// Login — sends FCM token as 3rd credential if available.
-  Future<bool> login(String email, String password, String role) async {
+  Future<bool> login(String email, String password, String role, {bool rememberMe = true}) async {
     _isLoading = true;
     notifyListeners();
 
@@ -25,7 +25,6 @@ class AuthProvider with ChangeNotifier {
         'role': role,
       };
 
-      // Include FCM token if already generated (permission granted during splash)
       if (FcmService.cachedToken != null) {
         body['fcm_token'] = FcmService.cachedToken!;
       }
@@ -34,8 +33,13 @@ class AuthProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _apiService.saveToken(data['access_token']);
-        // Fetch full profile (includes profile_picture_url and all fields)
+        if (rememberMe) {
+          // Persist token — survives app restarts
+          await _apiService.saveToken(data['access_token']);
+        } else {
+          // Session-only: keep in memory but don't persist to SharedPreferences
+          _apiService.setSessionToken(data['access_token']);
+        }
         await checkAuth();
         _isLoading = false;
         notifyListeners();
@@ -97,24 +101,27 @@ class AuthProvider with ChangeNotifier {
   /// Refreshes user data AND resends FCM token using stored JWT.
   Future<void> checkAuth() async {
     final token = await _apiService.getToken();
-    if (token == null) return;
+    if (token == null) return; // no token = not logged in, stay on login screen
 
     try {
       final response = await _apiService.get('/auth/me');
       if (response.statusCode == 200) {
         _user = User.fromJson(jsonDecode(response.body));
         notifyListeners();
-
         // Resend FCM token with stored JWT for already-logged-in users
         if (_user != null && FcmService.cachedToken != null) {
           FcmService.refreshTokenForLoggedInUser(_user!.userId);
         }
-      } else {
-        await logout();
+      } else if (response.statusCode == 401) {
+        // Token expired or invalid — clear it and go to login
+        await _apiService.deleteToken();
+        _user = null;
+        notifyListeners();
       }
+      // Any other error (500, timeout, network) — keep token, don't force logout
     } catch (e) {
       debugPrint('CheckAuth error: $e');
-      await logout();
+      // Network error — keep token so user stays logged in when back online
     }
   }
 }

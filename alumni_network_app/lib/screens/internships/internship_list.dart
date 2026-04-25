@@ -206,11 +206,7 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.business,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
+                                    Icon(Icons.business, size: 16, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.6)),
                                     const SizedBox(width: 4),
                                     Text(item.companyName),
                                   ],
@@ -218,11 +214,7 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      size: 16,
-                                      color: Colors.grey,
-                                    ),
+                                    Icon(Icons.location_on, size: 16, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.6)),
                                     const SizedBox(width: 4),
                                     Text(item.location ?? "Remote"),
                                   ],
@@ -230,19 +222,11 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.person_outline,
-                                      size: 16,
-                                      color: Colors.indigo,
-                                    ),
+                                    Icon(Icons.person_outline, size: 16, color: Theme.of(context).primaryColor),
                                     const SizedBox(width: 4),
                                     Text(
                                       'Posted by ${item.postedBy == user?.userId ? "You" : (item.postedByName.isEmpty || item.postedByName == "Unknown" ? "Alumni #${item.postedBy}" : item.postedByName)}',
-                                      style: const TextStyle(
-                                        color: Colors.indigo,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12, fontWeight: FontWeight.w500),
                                     ),
                                   ],
                                 ),
@@ -255,32 +239,18 @@ class _InternshipListScreenState extends State<InternshipListScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    if (item.duration != null &&
-                                        item.duration!.isNotEmpty)
+                                    if (item.duration != null && item.duration!.isNotEmpty)
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
-                                            Icons.access_time,
-                                            size: 14,
-                                            color: Colors.blue,
-                                          ),
+                                          Icon(Icons.access_time, size: 14, color: Theme.of(context).primaryColor),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            item.duration!,
-                                            style: const TextStyle(
-                                              color: Colors.blue,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
+                                          Text(item.duration!,
+                                              style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
                                         ],
                                       ),
                                     const SizedBox(height: 4),
-                                    const Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.grey,
-                                    ),
+                                    Icon(Icons.chevron_right, color: Theme.of(context).iconTheme.color?.withValues(alpha: 0.4)),
                                   ],
                                 ),
                                 if (user?.role == 'alumni' &&

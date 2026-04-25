@@ -109,22 +109,18 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'selected':
-        return Colors.green;
-      case 'shortlisted':
-        return Colors.blue;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.orange;
+      case 'selected': return Colors.green;
+      case 'shortlisted': return Theme.of(context).primaryColor;
+      case 'rejected': return Colors.red;
+      default: return Colors.orange;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
-    final isAlumniOwner =
-        user?.role == 'alumni' && widget.internship.postedBy == user?.userId;
+    final theme = Theme.of(context);
+    final isAlumniOwner = user?.role == 'alumni' && widget.internship.postedBy == user?.userId;
     final canViewApplicants = isAlumniOwner || user?.role == 'admin';
 
     return Scaffold(
@@ -133,20 +129,11 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
         actions: [
           if (canViewApplicants)
             TextButton.icon(
-              icon: const Icon(Icons.people, color: Colors.white),
-              label: const Text(
-                'Applicants',
-                style: TextStyle(color: Colors.white),
-              ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ApplicantsScreen(
-                    internship: widget.internship,
-                    userRole: user?.role ?? 'admin',
-                  ),
-                ),
-              ),
+              icon: const Icon(Icons.people),
+              label: const Text('Applicants'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ApplicantsScreen(internship: widget.internship, userRole: user?.role ?? 'admin'),
+              )),
             ),
         ],
       ),
@@ -157,49 +144,33 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
           children: [
             // Header card
             Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(widget.internship.companyName,
+                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: theme.textTheme.bodySmall?.color),
+                    const SizedBox(width: 4),
+                    Text(widget.internship.location ?? 'Remote', style: theme.textTheme.bodySmall),
+                  ]),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Icon(Icons.person_outline, size: 14, color: theme.primaryColor),
+                    const SizedBox(width: 4),
                     Text(
-                      widget.internship.companyName,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      'Posted by ${widget.internship.postedByName.isEmpty || widget.internship.postedByName == "Unknown" ? "Alumni #${widget.internship.postedBy}" : widget.internship.postedByName}',
+                      style: TextStyle(color: theme.primaryColor, fontSize: 13),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.internship.location ?? 'Remote',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.person_outline,
-                          size: 14,
-                          color: Colors.indigo,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Posted by ${widget.internship.postedByName.isEmpty || widget.internship.postedByName == "Unknown" ? "Alumni #${widget.internship.postedBy}" : widget.internship.postedByName}',
-                          style: const TextStyle(
-                            color: Colors.indigo,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ]),
+                ]),
               ),
             ),
             const SizedBox(height: 12),
 
-            // Student application status banner
+            // Application status banner (student)
             if (user?.role == 'student') ...[
               if (_checkingStatus)
                 const LinearProgressIndicator()
@@ -208,97 +179,77 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: _statusColor(_applicationStatus!).withAlpha(25),
+                    color: _statusColor(_applicationStatus!).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _statusColor(_applicationStatus!),
+                    border: Border.all(color: _statusColor(_applicationStatus!)),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline, color: _statusColor(_applicationStatus!)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Your application: ${_applicationStatus!.toUpperCase()}',
+                      style: TextStyle(color: _statusColor(_applicationStatus!), fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: _statusColor(_applicationStatus!),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Your application status: ${_applicationStatus!.toUpperCase()}',
-                        style: TextStyle(
-                          color: _statusColor(_applicationStatus!),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ]),
                 ),
               const SizedBox(height: 12),
             ],
 
-            // Details
-            _section(
-              context,
-              'Description',
-              widget.internship.description ?? 'No description provided.',
-            ),
-            _detailRow(
-              Icons.access_time,
-              'Duration',
-              widget.internship.duration ?? 'N/A',
-            ),
-            _detailRow(
-              Icons.currency_rupee,
-              'Stipend',
-              widget.internship.stipend ?? 'N/A',
-            ),
-            _detailRow(
-              Icons.event,
-              'Deadline',
-              widget.internship.applyDeadline ?? 'N/A',
-            ),
-            _detailRow(
-              Icons.chair,
-              'Seats Available',
-              '${widget.internship.seatsAvailable}',
-            ),
-            if (widget.internship.skillsRequired != null)
-              _section(
-                context,
-                'Skills Required',
-                widget.internship.skillsRequired!,
+            // Quick info chips row
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              if (widget.internship.duration != null && widget.internship.duration!.isNotEmpty)
+                _chip(Icons.access_time_outlined, widget.internship.duration!, Colors.blue),
+              if (widget.internship.stipend != null && widget.internship.stipend!.isNotEmpty)
+                _chip(Icons.currency_rupee, widget.internship.stipend!, Colors.green),
+              if (widget.internship.applyDeadline != null && widget.internship.applyDeadline!.isNotEmpty)
+                _chip(Icons.event_outlined, 'Deadline: ${widget.internship.applyDeadline!}', Colors.orange),
+              _chip(Icons.event_seat_outlined, '${widget.internship.seatsAvailable} seat${widget.internship.seatsAvailable != 1 ? 's' : ''}', theme.primaryColor),
+            ]),
+            const SizedBox(height: 16),
+
+            // Description
+            if (widget.internship.description != null && widget.internship.description!.isNotEmpty) ...[
+              _sectionTitle('Description'),
+              Text(widget.internship.description!, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+              const SizedBox(height: 16),
+            ],
+
+            // Skills
+            if (widget.internship.skillsRequired != null && widget.internship.skillsRequired!.isNotEmpty) ...[
+              _sectionTitle('Skills Required'),
+              Wrap(
+                spacing: 8, runSpacing: 6,
+                children: widget.internship.skillsRequired!
+                    .split(RegExp(r'[,\n]'))
+                    .map((s) => s.trim())
+                    .where((s) => s.isNotEmpty)
+                    .map((s) => Chip(
+                          label: Text(s, style: const TextStyle(fontSize: 12)),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ))
+                    .toList(),
               ),
+              const SizedBox(height: 16),
+            ],
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
-            // Apply button for students
+            // Apply button (student)
             if (user?.role == 'student')
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _applicationStatus != null
-                      ? null
-                      : () => _apply(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _applicationStatus != null
-                        ? Colors.grey
-                        : Colors.indigo,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  onPressed: _applicationStatus != null ? null : () => _apply(context),
                   child: Text(
-                    _applicationStatus != null
-                        ? 'Already Applied'
-                        : 'Apply Now',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    _applicationStatus != null ? 'Already Applied' : 'Apply Now',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
 
-            // Alumni/Admin view applicants button
+            // View applicants (alumni/admin)
             if (canViewApplicants)
               SizedBox(
                 width: double.infinity,
@@ -306,22 +257,9 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.people),
                   label: const Text('View Applicants'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ApplicantsScreen(
-                        internship: widget.internship,
-                        userRole: user?.role ?? 'admin',
-                      ),
-                    ),
-                  ),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ApplicantsScreen(internship: widget.internship, userRole: user?.role ?? 'admin'),
+                  )),
                 ),
               ),
           ],
@@ -330,36 +268,22 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
     );
   }
 
-  Widget _section(BuildContext context, String title, String content) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(content),
-        ],
-      ),
-    );
-  }
+  Widget _sectionTitle(String title) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+  );
 
-  Widget _detailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.indigo),
-          const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Text(value),
-        ],
-      ),
-    );
-  }
+  Widget _chip(IconData icon, String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: 0.3)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+    ]),
+  );
 }

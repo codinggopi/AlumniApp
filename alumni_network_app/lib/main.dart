@@ -256,15 +256,22 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _animationFinished = false;
+  bool _authChecked = false;
 
   @override
   void initState() {
     super.initState();
-    Provider.of<AuthProvider>(context, listen: false).checkAuth();
+    _init();
     _requestPermissions();
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) setState(() => _animationFinished = true);
-    });
+  }
+
+  Future<void> _init() async {
+    // Run animation timer and auth check in parallel
+    await Future.wait([
+      Future.delayed(const Duration(seconds: 4)),
+      Provider.of<AuthProvider>(context, listen: false).checkAuth(),
+    ]);
+    if (mounted) setState(() { _animationFinished = true; _authChecked = true; });
   }
 
   Future<void> _requestPermissions() async {
@@ -274,7 +281,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_animationFinished) return const animated.SplashScreen();
+    // Show splash until BOTH animation is done AND auth check is complete
+    if (!_animationFinished || !_authChecked) return const animated.SplashScreen();
 
     final auth = Provider.of<AuthProvider>(context);
     if (auth.isAuthenticated) return const HomeScreen();
