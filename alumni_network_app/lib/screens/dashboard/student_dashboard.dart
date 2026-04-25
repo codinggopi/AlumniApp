@@ -25,7 +25,6 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   int _streak = 0;
   int _longestStreak = 0;
   List<String> _checkinHistory = [];
-  bool _challengeDone = false;
   final RouteObserver<ModalRoute<void>> _routeObserver = RouteObserver<ModalRoute<void>>();
 
   @override
@@ -85,27 +84,6 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
         });
       }
     } catch (_) {}
-  }
-
-  int _weekNumber(DateTime date) {
-    final firstDay = DateTime(date.year, 1, 1);
-    return ((date.difference(firstDay).inDays) / 7).floor() + 1;
-  }
-
-  Future<void> _markChallengeDone() async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final weekKey = 'challenge_done_week_${now.year}_${_weekNumber(now)}';
-    await prefs.setBool(weekKey, true);
-    setState(() => _challengeDone = true);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🏆 Challenge completed! Great work!'),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
-    }
   }
 
   int _profileCompletion(User user) {
@@ -653,38 +631,259 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
     ),
   );
 
-  // ── 6. Weekly Challenge ────────────────────────────────────────────────────
-  Widget _buildWeeklyChallenge() => Container(
-    margin: const EdgeInsets.only(top: 20),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFF7B1FA2).withValues(alpha: 0.3)),
-    ),
-    child: Row(
-      children: [
-        const Text('🏆', style: TextStyle(fontSize: 28)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Weekly Challenge', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF7B1FA2))),
-              const SizedBox(height: 2),
-              const Text('Connect with 2 alumni this week', style: TextStyle(fontSize: 12, color: Color(0xFF757575))),
-            ],
+  // ── 6. Weekly Goals ────────────────────────────────────────────────────────
+  Widget _buildWeeklyChallenge() {
+    final stats = _data?['stats'] ?? {};
+    final connections = (stats['connections'] ?? 0) as int;
+    final applied = (stats['applications_sent'] ?? 0) as int;
+
+    final goals = [
+      _GoalItem(
+        icon: '🤝',
+        label: 'Connect with 3 alumni',
+        current: connections.clamp(0, 3),
+        target: 3,
+        color: const Color(0xFF1565C0),
+      ),
+      
+      _GoalItem(
+        icon: '🎓',
+        label: 'Book a mentorship session',
+        current: _checkinHistory.isNotEmpty ? 1 : 0,
+        target: 1,
+        color: const Color(0xFF00897B),
+      ),
+    ];
+
+    final allDone = goals.every((g) => g.current >= g.target);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF7B1FA2).withValues(alpha: 0.25)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('🏆', style: TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('Weekly Goals',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF7B1FA2))),
           ),
-        ),
-        _challengeDone
-            ? const Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 28)
-            : TextButton(
-                onPressed: _markChallengeDone,
-                style: TextButton.styleFrom(foregroundColor: const Color(0xFF7B1FA2)),
-                child: const Text('Done!', style: TextStyle(fontWeight: FontWeight.w700)),
+          if (allDone)
+            GestureDetector(
+              onTap: () => _showGoalVerification(goals),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('All done! 🎉',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2E7D32))),
+                  SizedBox(width: 4),
+                  Icon(Icons.verified, size: 13, color: Color(0xFF2E7D32)),
+                ]),
               ),
-      ],
-    ),
+            )
+          else
+            GestureDetector(
+              onTap: () => _showGoalVerification(goals),
+              child: const Text('View proof',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF7B1FA2), fontWeight: FontWeight.w600)),
+            ),
+        ]),
+        const SizedBox(height: 12),
+        ...goals.map((g) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(g.icon, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(g.label,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+              Text('${g.current}/${g.target}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: g.current >= g.target ? g.color : Colors.grey[500])),
+              const SizedBox(width: 6),
+              Icon(
+                g.current >= g.target ? Icons.check_circle : Icons.radio_button_unchecked,
+                size: 18,
+                color: g.current >= g.target ? g.color : Colors.grey[300],
+              ),
+            ]),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (g.current / g.target).clamp(0.0, 1.0),
+                backgroundColor: g.color.withValues(alpha: 0.1),
+                color: g.color,
+                minHeight: 5,
+              ),
+            ),
+          ]),
+        )),
+      ]),
+    );
+  }
+
+  void _showGoalVerification(List<_GoalItem> goals) {
+    final activity = (_data?['recent_activity'] as List?) ?? [];
+    final stats = _data?['stats'] ?? {};
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, ctrl) => Column(children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(children: [
+              const Text('🏆', style: TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Weekly Goals — Verification',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView(controller: ctrl, padding: const EdgeInsets.all(16), children: [
+              // Goal status cards
+              ...goals.map((g) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: g.current >= g.target
+                      ? g.color.withValues(alpha: 0.06)
+                      : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: g.current >= g.target
+                        ? g.color.withValues(alpha: 0.3)
+                        : Colors.grey[200]!,
+                  ),
+                ),
+                child: Row(children: [
+                  Text(g.icon, style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(g.label,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    const SizedBox(height: 2),
+                    Text(
+                      g.current >= g.target
+                          ? '✅ Completed — ${g.current}/${g.target}'
+                          : '⏳ In progress — ${g.current}/${g.target}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: g.current >= g.target ? g.color : Colors.grey[500]),
+                    ),
+                  ])),
+                  Icon(
+                    g.current >= g.target ? Icons.verified : Icons.pending_outlined,
+                    color: g.current >= g.target ? g.color : Colors.grey[400],
+                  ),
+                ]),
+              )),
+              const SizedBox(height: 8),
+              // Evidence from recent activity
+              const Text('Recent Activity',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              if (activity.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text('No recent activity recorded yet.',
+                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                )
+              else
+                ...activity.map((a) {
+                  final type = a['type'] as String? ?? '';
+                  final icon = type == 'connection'
+                      ? Icons.people
+                      : type == 'message'
+                          ? Icons.chat_bubble_outline
+                          : type == 'event'
+                              ? Icons.event_outlined
+                              : Icons.notifications_outlined;
+                  final color = type == 'connection'
+                      ? const Color(0xFF1565C0)
+                      : type == 'message'
+                          ? const Color(0xFFAD1457)
+                          : const Color(0xFF757575);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Row(children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: color.withValues(alpha: 0.1),
+                        child: Icon(icon, size: 14, color: color),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(a['message'] ?? '',
+                          style: const TextStyle(fontSize: 12))),
+                    ]),
+                  );
+                }),
+              const SizedBox(height: 8),
+              // Stats summary
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3E5F5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Your Stats This Period',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF7B1FA2))),
+                  const SizedBox(height: 8),
+                  _statRow('Connections', '${stats['connections'] ?? 0}'),
+                  _statRow('Messages', '${stats['unread_messages'] ?? 0} unread'),
+                  _statRow('Applications', '${stats['applications_sent'] ?? 0} sent'),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _statRow(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(children: [
+      Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
+      Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF7B1FA2))),
+    ]),
   );
 
   // ── 7. To-Do Quick Card ────────────────────────────────────────────────────
@@ -888,4 +1087,19 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
       ),
     )).toList(),
   );
+}
+
+class _GoalItem {
+  final String icon;
+  final String label;
+  final int current;
+  final int target;
+  final Color color;
+  const _GoalItem({
+    required this.icon,
+    required this.label,
+    required this.current,
+    required this.target,
+    required this.color,
+  });
 }

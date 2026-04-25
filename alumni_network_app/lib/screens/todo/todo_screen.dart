@@ -720,13 +720,15 @@ class _TodoCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  size: 18,
-                  color: Colors.grey,
-                ),
+                icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
                 onPressed: onEdit,
                 padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                onPressed: onDelete,
+                padding: const EdgeInsets.only(left: 2),
                 constraints: const BoxConstraints(),
               ),
             ],
