@@ -1108,6 +1108,25 @@ class EmailChangeVerifyRequest(BaseModel):
     otp: str
 
 
+@app.post("/profile/admin-change-email", tags=["profile"])
+def admin_change_email(payload: EmailChangeRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can use this endpoint")
+
+    # Check new email not already taken
+    existing = db.query(models.User).filter(
+        models.User.email == payload.new_email,
+        models.User.user_id != payload.user_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already in use by another account")
+
+    user = get_user_by_id(db, payload.user_id)
+    user.email = payload.new_email
+    db.commit()
+    return {"status": "email_updated", "new_email": payload.new_email}
+
+
 @app.post("/profile/request-email-change", tags=["profile"])
 def request_email_change(payload: EmailChangeRequest, db: Session = Depends(get_db)):
     user = get_user_by_id(db, payload.user_id)

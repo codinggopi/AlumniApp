@@ -37,6 +37,12 @@ class ApiService {
     await _prefs!.remove(_tokenKey);
   }
 
+  /// Set token in memory only — not persisted to SharedPreferences.
+  /// Used when "Remember Me" is unchecked.
+  void setSessionToken(String token) {
+    _cachedToken = token;
+  }
+
   Map<String, String> _headers(String? token) {
     final headers = <String, String>{
       'Content-Type': 'application/json',

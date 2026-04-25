@@ -472,6 +472,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final otpCtrl = TextEditingController();
     bool otpSent = false;
     bool loading = false;
+    final isAdmin = Provider.of<AuthProvider>(context, listen: false).user?.role == 'admin';
 
     showDialog(
       context: context,
@@ -482,6 +483,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Admin hint
+              if (isAdmin)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(children: [
+                    Icon(Icons.admin_panel_settings, size: 16, color: Theme.of(context).primaryColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text('Admin: email will be updated directly without OTP.',
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).primaryColor)),
+                    ),
+                  ]),
+                ),
               TextField(
                 controller: newEmailCtrl,
                 enabled: !otpSent,
@@ -492,7 +506,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
               ),
-              if (otpSent) ...[
+              // OTP field — only for non-admin after OTP is sent
+              if (!isAdmin && otpSent) ...[
                 const SizedBox(height: 12),
                 TextField(
                   controller: otpCtrl,
@@ -516,6 +531,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 padding: EdgeInsets.all(8),
                 child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
               )
+            // ── ADMIN: direct update, no OTP ──────────────────────────────
+            else if (isAdmin)
+              ElevatedButton(
+                onPressed: () async {
+                  final newEmail = newEmailCtrl.text.trim();
+                  if (newEmail.isEmpty || !newEmail.contains('@')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Enter a valid email')),
+                    );
+                    return;
+                  }
+                  setDlgState(() => loading = true);
+                  final res = await ApiService().post('/profile/admin-change-email', {
+                    'user_id': userId,
+                    'new_email': newEmail,
+                  });
+                  setDlgState(() => loading = false);
+                  if (res.statusCode == 200) {
+                    Navigator.pop(ctx);
+                    await Provider.of<AuthProvider>(context, listen: false).checkAuth();
+                    if (mounted) {
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Email updated successfully!')),
+                      );
+                    }
+                  } else {
+                    final msg = jsonDecode(res.body)['detail'] ?? 'Failed to update email';
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  }
+                },
+                child: const Text('Update Email'),
+              )
+            // ── NON-ADMIN: OTP flow ────────────────────────────────────────
             else if (!otpSent)
               ElevatedButton(
                 onPressed: () async {
