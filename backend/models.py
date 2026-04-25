@@ -282,10 +282,11 @@ class MentorshipSlot(Base):
 
     slot_id = Column(Integer, primary_key=True, index=True)
     alumni_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    day = Column(String(20), nullable=False)       # e.g. "Saturday"
-    time_from = Column(String(10), nullable=False)  # e.g. "17:00"
-    time_to = Column(String(10), nullable=False)    # e.g. "19:00"
+    day = Column(String(20), nullable=False)
+    time_from = Column(String(10), nullable=False)
+    time_to = Column(String(10), nullable=False)
     max_students = Column(Integer, default=3, nullable=False)
+    meeting_link = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     alumni = relationship("User", foreign_keys=[alumni_id])

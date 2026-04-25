@@ -2580,6 +2580,7 @@ class MentorshipSlotCreate(BaseModel):
     time_from: str
     time_to: str
     max_students: int = 3
+    meeting_link: Optional[str] = None
 
 
 @app.post("/mentorship/slots", tags=["alumni"])
@@ -2596,11 +2597,31 @@ def create_slot(
         time_from=payload.time_from,
         time_to=payload.time_to,
         max_students=payload.max_students,
+        meeting_link=payload.meeting_link,
     )
     db.add(slot)
     db.commit()
     db.refresh(slot)
     return {"slot_id": slot.slot_id}
+
+
+@app.patch("/mentorship/slots/{slot_id}/meeting-link", tags=["alumni"])
+def update_meeting_link(
+    slot_id: int,
+    payload: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "alumni":
+        raise HTTPException(status_code=403, detail="Alumni only")
+    slot = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.slot_id == slot_id).first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    if slot.alumni_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not your slot")
+    slot.meeting_link = payload.get("meeting_link", "")
+    db.commit()
+    return {"detail": "Meeting link updated"}
 
 
 @app.get("/mentorship/slots/{alumni_id}", tags=["alumni"])
@@ -2615,6 +2636,7 @@ def get_slots(alumni_id: int, db: Session = Depends(get_db)):
             "time_from": s.time_from,
             "time_to": s.time_to,
             "max_students": s.max_students,
+            "meeting_link": s.meeting_link,
             "booked": len(s.bookings),
             "available": s.max_students - len(s.bookings),
         } for s in slots
@@ -2659,6 +2681,15 @@ def delete_slot(
         raise HTTPException(status_code=404, detail="Slot not found")
     if slot.alumni_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not your slot")
+    # Notify all booked students before deleting
+    bookings = db.query(models.MentorshipBooking).filter(models.MentorshipBooking.slot_id == slot_id).all()
+    for b in bookings:
+        db.add(models.Notification(
+            user_id=b.student_id,
+            type="connection",
+            message=f"The mentorship slot ({slot.day} {slot.time_from}–{slot.time_to}) by {current_user.full_name} has been cancelled.",
+            is_read=False,
+        ))
     db.query(models.MentorshipBooking).filter(models.MentorshipBooking.slot_id == slot_id).delete()
     db.delete(slot)
     db.commit()
@@ -2712,9 +2743,24 @@ def update_booking_status(
     new_status = payload.get("status")
     if new_status not in ("confirmed", "rejected", "completed"):
         raise HTTPException(status_code=400, detail="Invalid status")
+
+    # If accepting and a meeting_link is provided, save it to the slot
+    if new_status == "confirmed":
+        meeting_link = payload.get("meeting_link")
+        if meeting_link:
+            booking.slot.meeting_link = meeting_link
+
+        # Notify the student
+        db.add(models.Notification(
+            user_id=booking.student_id,
+            type="connection",
+            message=f"Your mentorship session with {current_user.full_name} is confirmed! Join link is now available.",
+            is_read=False,
+        ))
+
     booking.status = new_status
     db.commit()
-    return {"detail": "Status updated"}
+    return {"detail": "Status updated", "meeting_link": booking.slot.meeting_link}
 
 
 @app.get("/mentorship/available", tags=["alumni"])
@@ -2775,10 +2821,17 @@ def get_my_bookings(
             "day": s.day,
             "time_from": s.time_from,
             "time_to": s.time_to,
+            "alumni_id": s.alumni_id,
             "alumni_name": alumni_user.full_name if alumni_user else "Unknown",
             "alumni_job_title": alumni_profile.job_title if alumni_profile else None,
             "alumni_company": alumni_profile.company if alumni_profile else None,
             "alumni_picture": alumni_user.profile_picture_url if alumni_user else None,
+            # Only expose meeting_link to confirmed students
+            "meeting_link": s.meeting_link if b.status == "confirmed" else None,
+            "has_feedback": db.query(models.Feedback).filter(
+                models.Feedback.student_id == current_user.user_id,
+                models.Feedback.target_id == s.alumni_id,
+            ).first() is not None,
         })
     return result
 

@@ -152,6 +152,13 @@ def ensure_schema_updates():
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN DEFAULT 0 NOT NULL"))
 
+    # MentorshipSlot: add meeting_link column if missing
+    if "mentorship_slots" in inspector.get_table_names():
+        slot_cols = {c["name"] for c in inspector.get_columns("mentorship_slots")}
+        if "meeting_link" not in slot_cols:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE mentorship_slots ADD COLUMN meeting_link VARCHAR(500)"))
+
     # Feedback table migration: old schema had alumni_id, new schema uses target_id + target_role + admin_response
     if "feedback" in inspector.get_table_names():
         fb_cols = {c["name"] for c in inspector.get_columns("feedback")}

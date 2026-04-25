@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'providers/auth_provider.dart';
 import 'providers/message_count_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/api_service.dart';
 import 'services/fcm_service.dart';
 import 'services/permission_service.dart';
@@ -44,6 +45,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => MessageCountProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -55,12 +57,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return MaterialApp(
       title: 'Alumni Network',
       debugShowCheckedModeBanner: false,
+      themeMode: themeProvider.mode,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Inter',
+        brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1565C0),
           brightness: Brightness.light,
@@ -114,6 +119,69 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.white,
           selectedItemColor: Color(0xFF1565C0),
           unselectedItemColor: Color(0xFF9E9E9E),
+          elevation: 8,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+          unselectedLabelStyle: TextStyle(fontSize: 11),
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Inter',
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E1E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: EdgeInsets.zero,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1565C0),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF2A2A2A),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Color(0xFF1E1E1E),
+          selectedItemColor: Color(0xFF64B5F6),
+          unselectedItemColor: Color(0xFF757575),
           elevation: 8,
           type: BottomNavigationBarType.fixed,
           selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
@@ -458,6 +526,17 @@ class _DashboardViewState extends State<DashboardView> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          Consumer<ThemeProvider>(
+            builder: (_, tp, __) => IconButton(
+              icon: Icon(tp.icon),
+              tooltip: tp.mode == ThemeMode.system
+                  ? 'System theme'
+                  : tp.mode == ThemeMode.light
+                      ? 'Light mode'
+                      : 'Dark mode',
+              onPressed: tp.toggle,
+            ),
+          ),
           _NotificationBell(),
           const SizedBox(width: 4),
           GestureDetector(

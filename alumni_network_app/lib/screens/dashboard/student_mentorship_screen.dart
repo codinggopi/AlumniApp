@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import 'submit_feedback_screen.dart';
 
@@ -23,6 +24,13 @@ class _StudentMentorshipScreenState extends State<StudentMentorshipScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _fetchAvailable();
+    _fetchMyBookings();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh bookings when returning to this screen
     _fetchMyBookings();
   }
 
@@ -266,12 +274,61 @@ class _BookingCard extends StatelessWidget {
   final VoidCallback? onFeedbackSubmitted;
   const _BookingCard({required this.booking, this.onFeedbackSubmitted});
 
+  String _timeLabel(String day, String timeFrom, String timeTo) {
+    final now = DateTime.now();
+    final days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    final targetWeekday = days.indexOf(day) + 1;
+    final diff = (targetWeekday - now.weekday + 7) % 7;
+    final sessionDate = now.add(Duration(days: diff));
+    final fromParts = timeFrom.split(':');
+    final toParts = timeTo.split(':');
+    if (fromParts.length < 2 || toParts.length < 2) return day;
+    final start = DateTime(sessionDate.year, sessionDate.month, sessionDate.day,
+        int.parse(fromParts[0]), int.parse(fromParts[1]));
+    final end = DateTime(sessionDate.year, sessionDate.month, sessionDate.day,
+        int.parse(toParts[0]), int.parse(toParts[1]));
+    if (now.isBefore(start)) {
+      final mins = start.difference(now).inMinutes;
+      if (mins < 60) return 'Starts in ${mins}m';
+      if (mins < 1440) return 'Starts in ${start.difference(now).inHours}h';
+      return 'Starts $day';
+    } else if (now.isAfter(end)) {
+      return 'Session ended';
+    } else {
+      return 'Live now 🔴';
+    }
+  }
+
+  bool _isLive(String day, String timeFrom, String timeTo) {
+    final now = DateTime.now();
+    final days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    final targetWeekday = days.indexOf(day) + 1;
+    final diff = (targetWeekday - now.weekday + 7) % 7;
+    final sessionDate = now.add(Duration(days: diff));
+    final fromParts = timeFrom.split(':');
+    final toParts = timeTo.split(':');
+    if (fromParts.length < 2 || toParts.length < 2) return false;
+    final start = DateTime(sessionDate.year, sessionDate.month, sessionDate.day,
+        int.parse(fromParts[0]), int.parse(fromParts[1]));
+    final end = DateTime(sessionDate.year, sessionDate.month, sessionDate.day,
+        int.parse(toParts[0]), int.parse(toParts[1]));
+    return now.isAfter(start) && now.isBefore(end);
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = booking['status'] as String;
+    final isConfirmed = status == 'confirmed';
     final isCompleted = status == 'completed';
     final hasFeedback = booking['has_feedback'] as bool? ?? false;
-    final statusColor = status == 'confirmed'
+    final meetingLink = booking['meeting_link'] as String?;
+    final day = booking['day'] as String? ?? '';
+    final timeFrom = booking['time_from'] as String? ?? '';
+    final timeTo = booking['time_to'] as String? ?? '';
+    final live = isConfirmed && _isLive(day, timeFrom, timeTo);
+    final timeLabel = isConfirmed ? _timeLabel(day, timeFrom, timeTo) : null;
+
+    final statusColor = isConfirmed
         ? const Color(0xFF2E7D32)
         : isCompleted
             ? Colors.blue
@@ -285,6 +342,7 @@ class _BookingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: live ? Border.all(color: const Color(0xFF2E7D32), width: 2) : null,
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -313,9 +371,15 @@ class _BookingCard extends StatelessWidget {
             Row(children: [
               const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF9E9E9E)),
               const SizedBox(width: 4),
-              Text('${booking['day']}  ${booking['time_from']} – ${booking['time_to']}',
+              Text('$day  $timeFrom – $timeTo',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
             ]),
+            if (timeLabel != null) ...[
+              const SizedBox(height: 2),
+              Text(timeLabel,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                      color: live ? const Color(0xFF2E7D32) : const Color(0xFF9E9E9E))),
+            ],
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -330,13 +394,67 @@ class _BookingCard extends StatelessWidget {
             ),
           ),
         ]),
-        // Feedback button — only for completed sessions
+        const SizedBox(height: 12),
+        // Status-based action
+        if (status == 'pending')
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(color: const Color(0xFFFFF8E1), borderRadius: BorderRadius.circular(10)),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.hourglass_empty, size: 16, color: Color(0xFFF57C00)),
+              SizedBox(width: 6),
+              Text('Waiting for approval', style: TextStyle(color: Color(0xFFF57C00), fontWeight: FontWeight.w600, fontSize: 13)),
+            ]),
+          )
+        else if (status == 'rejected')
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(10)),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
+              SizedBox(width: 6),
+              Text('Booking rejected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13)),
+            ]),
+          )
+        else if (isConfirmed && meetingLink != null && meetingLink.isNotEmpty)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final uri = Uri.parse(meetingLink);
+                try { await launchUrl(uri, mode: LaunchMode.externalApplication); } catch (_) {}
+              },
+              icon: const Icon(Icons.videocam, color: Colors.white, size: 18),
+              label: Text(live ? 'Join Now 🔴' : 'Open Meeting Link',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: live ? const Color(0xFF2E7D32) : const Color(0xFF1565C0),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          )
+        else if (isConfirmed)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(10)),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF2E7D32)),
+              SizedBox(width: 6),
+              Text('Confirmed — meeting link coming soon',
+                  style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w600, fontSize: 12)),
+            ]),
+          ),
+        // Feedback for completed
         if (isCompleted) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: hasFeedback
-                ? Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+                ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(Icons.check_circle, color: Color(0xFF7B1FA2), size: 16),
                     SizedBox(width: 6),
                     Text('Feedback submitted', style: TextStyle(color: Color(0xFF7B1FA2), fontSize: 13, fontWeight: FontWeight.w600)),

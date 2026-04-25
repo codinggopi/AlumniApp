@@ -34,12 +34,13 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
     final fromCtrl = TextEditingController(text: '17:00');
     final toCtrl = TextEditingController(text: '19:00');
     final maxCtrl = TextEditingController(text: '3');
+    final linkCtrl = TextEditingController();
     final days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
     showDialog(context: context, builder: (_) => StatefulBuilder(
       builder: (ctx, setDlg) => AlertDialog(
         title: const Text('Add Mentorship Slot'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
             initialValue: day,
             decoration: const InputDecoration(labelText: 'Day', border: OutlineInputBorder()),
@@ -56,20 +57,31 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
           TextField(
             controller: maxCtrl,
             keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Max Students', border: OutlineInputBorder(), isDense: true),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: linkCtrl,
             decoration: const InputDecoration(
-              labelText: 'Max Students',
+              labelText: 'Meeting Link (optional)',
+              hintText: 'https://meet.google.com/...',
               border: OutlineInputBorder(),
               isDense: true,
+              prefixIcon: Icon(Icons.videocam_outlined),
             ),
           ),
-        ]),
+        ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final maxStudents = int.tryParse(maxCtrl.text.trim()) ?? 3;
               await ApiService().post('/mentorship/slots', {
-                'day': day, 'time_from': fromCtrl.text, 'time_to': toCtrl.text, 'max_students': maxStudents,
+                'day': day,
+                'time_from': fromCtrl.text,
+                'time_to': toCtrl.text,
+                'max_students': maxStudents,
+                if (linkCtrl.text.trim().isNotEmpty) 'meeting_link': linkCtrl.text.trim(),
               });
               if (ctx.mounted) { Navigator.pop(ctx); _fetch(); }
             },
@@ -87,8 +99,37 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _SlotStudentsSheet(slot: slot),
+      builder: (_) => _SlotStudentsSheet(slot: slot, onRefresh: _fetch),
     );
+  }
+
+  Future<void> _editMeetingLink(int slotId, String? current) async {
+    final ctrl = TextEditingController(text: current ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Meeting Link'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Google Meet / Zoom link',
+            hintText: 'https://meet.google.com/...',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.videocam_outlined),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await ApiService().patch('/mentorship/slots/$slotId/meeting-link', {'meeting_link': result});
+    _fetch();
   }
 
   Future<void> _deleteSlot(int slotId) async {
@@ -169,6 +210,28 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
                             const Text('· tap to view', style: TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
                           ],
                         ]),
+                        const SizedBox(height: 4),
+                        // Meeting link row
+                        Row(children: [
+                          Icon(Icons.videocam_outlined, size: 14,
+                              color: (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
+                                  ? const Color(0xFF1565C0) : Colors.grey[400]),
+                          const SizedBox(width: 4),
+                          Expanded(child: Text(
+                            (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
+                                ? s['meeting_link']
+                                : 'No meeting link yet',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: (s['meeting_link'] != null && s['meeting_link'].toString().isNotEmpty)
+                                    ? const Color(0xFF1565C0) : Colors.grey[400]),
+                            overflow: TextOverflow.ellipsis,
+                          )),
+                          GestureDetector(
+                            onTap: () => _editMeetingLink(s['slot_id'] as int, s['meeting_link'] as String?),
+                            child: const Icon(Icons.edit, size: 14, color: Color(0xFF9E9E9E)),
+                          ),
+                        ]),
                         const SizedBox(height: 6),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
@@ -203,7 +266,8 @@ class _AlumniMentorshipScreenState extends State<AlumniMentorshipScreen> {
 
 class _SlotStudentsSheet extends StatefulWidget {
   final Map slot;
-  const _SlotStudentsSheet({required this.slot});
+  final VoidCallback? onRefresh;
+  const _SlotStudentsSheet({required this.slot, this.onRefresh});
 
   @override
   State<_SlotStudentsSheet> createState() => _SlotStudentsSheetState();
@@ -230,7 +294,58 @@ class _SlotStudentsSheetState extends State<_SlotStudentsSheet> {
   }
 
   Future<void> _updateStatus(int bookingId, String status) async {
-    await ApiService().patch('/mentorship/bookings/$bookingId/status', {'status': status});
+    final slotId = widget.slot['slot_id'] as int;
+    final currentLink = widget.slot['meeting_link'] as String?;
+
+    // If accepting and no meeting link yet, prompt for one
+    String? meetingLink;
+    if (status == 'confirmed' && (currentLink == null || currentLink.isEmpty)) {
+      final ctrl = TextEditingController();
+      meetingLink = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Add Meeting Link'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Add a meeting link so the student can join the session.',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: 'Google Meet / Zoom link',
+                hintText: 'https://meet.google.com/...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.videocam_outlined),
+              ),
+            ),
+          ]),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, ''),
+              child: const Text('Skip for now'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Save & Accept'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final body = {'status': status};
+    if (meetingLink != null && meetingLink.isNotEmpty) {
+      body['meeting_link'] = meetingLink;
+    }
+
+    await ApiService().patch('/mentorship/bookings/$bookingId/status', body);
+
+    // If we saved a meeting link, also update the slot locally
+    if (meetingLink != null && meetingLink.isNotEmpty) {
+      await ApiService().patch('/mentorship/slots/$slotId/meeting-link', {'meeting_link': meetingLink});
+      widget.onRefresh?.call();
+    }
+
     _fetch();
   }
 

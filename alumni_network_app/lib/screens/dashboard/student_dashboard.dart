@@ -635,7 +635,6 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
   Widget _buildWeeklyChallenge() {
     final stats = _data?['stats'] ?? {};
     final connections = (stats['connections'] ?? 0) as int;
-    final applied = (stats['applications_sent'] ?? 0) as int;
 
     final goals = [
       _GoalItem(
@@ -645,7 +644,6 @@ class _StudentDashboardState extends State<StudentDashboard> with RouteAware {
         target: 3,
         color: const Color(0xFF1565C0),
       ),
-      
       _GoalItem(
         icon: '🎓',
         label: 'Book a mentorship session',
