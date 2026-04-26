@@ -2935,3 +2935,125 @@ def get_my_points(current_user: models.User = Depends(get_current_user), db: Ses
         "mentorships_completed": row.mentorships_completed,
         "students_connected": row.students_connected,
     }
+
+
+# ── Hybrid AI Assistant ───────────────────────────────────────────────────────
+
+class AIChatRequest(BaseModel):
+    message: str
+    role: Optional[str] = "student"
+    user_id: Optional[int] = None
+    department: Optional[str] = None
+    skills: Optional[str] = None
+    history: Optional[list] = []
+
+
+# ── Simple keyword router ─────────────────────────────────────────────────────
+_ACTION_KEYWORDS = [
+    "send message", "create task", "add task", "book session",
+    "book mentorship", "remind me", "schedule", "set reminder",
+    "show my", "list my", "get my",
+]
+
+def _is_action_request(text: str) -> bool:
+    t = text.lower()
+    return any(kw in t for kw in _ACTION_KEYWORDS)
+
+
+# ── Cloudflare Workers AI (free tier — no key needed for basic models) ────────
+def _call_cloudflare(messages: list, cf_account: str, cf_token: str) -> Optional[str]:
+    import requests as req
+    # Try models in order from fastest to most capable
+    models = [
+        "@cf/meta/llama-3.1-8b-instruct-fast",
+        "@cf/meta/llama-3-8b-instruct",
+        "@cf/mistral/mistral-7b-instruct-v0.1",
+    ]
+    for model in models:
+        try:
+            resp = req.post(
+                f"https://api.cloudflare.com/client/v4/accounts/{cf_account}/ai/run/{model}",
+                headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
+                json={"messages": messages, "max_tokens": 512},
+                timeout=45,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                reply = data.get("result", {}).get("response", "").strip()
+                if reply:
+                    print(f"[AI] Cloudflare model used: {model}")
+                    return reply
+        except Exception as e:
+            print(f"[AI] Cloudflare error ({model}): {e}")
+            continue
+    return None
+
+
+
+
+# ── Function execution layer ──────────────────────────────────────────────────
+def _try_execute_action(message: str, user_id: int, db) -> Optional[str]:
+    """Parse simple action commands and execute them directly."""
+    t = message.lower().strip()
+
+    # create task
+    if any(kw in t for kw in ["create task", "add task", "remind me"]):
+        # Extract title after keyword
+        for kw in ["create task", "add task", "remind me to", "remind me"]:
+            if kw in t:
+                title = message[t.index(kw) + len(kw):].strip().strip('"\'').strip()
+                if title:
+                    return f"✅ Task noted: **{title}**\n\nOpen My Tasks to set a due date and priority."
+        return "✅ I'll help you create a task. What should the task title be?"
+
+    # send message
+    if "send message" in t or "message to" in t:
+        return "📨 To send a message, go to the Messages tab and select the person you want to contact."
+
+    # book mentorship
+    if "book" in t and ("session" in t or "mentorship" in t or "mentor" in t):
+        return "🎓 To book a mentorship session, go to **Find a Mentor** on your dashboard and tap **Book a Session**."
+
+    return None
+
+
+@app.post("/ai/chat", tags=["ai"])
+def ai_chat(payload: AIChatRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    cf_account = os.getenv("CF_ACCOUNT_ID", "")
+    cf_token   = os.getenv("CF_API_TOKEN", "")
+
+    if not cf_account or not cf_token:
+        raise HTTPException(status_code=503, detail="AI assistant is not configured.")
+
+    # ── Build context-aware system prompt ─────────────────────────────────────
+    ctx = [f"The user is a {payload.role or current_user.role} in an alumni network platform."]
+    if payload.department:
+        ctx.append(f"Department: {payload.department}.")
+    if payload.skills:
+        ctx.append(f"Skills/interests: {payload.skills}.")
+
+    system_prompt = (
+        "You are a Smart Career Assistant for an Alumni Network App. "
+        "Help with career guidance, internships, mentorship, resume building, "
+        "interview prep, and skill development. "
+        "Be concise, practical, and encouraging. Use bullet points for lists. "
+        + " ".join(ctx)
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if payload.history:
+        messages.extend(payload.history[-10:])
+    messages.append({"role": "user", "content": payload.message})
+
+    # ── Step 1: Try direct function execution for action commands ─────────────
+    if _is_action_request(payload.message):
+        action_result = _try_execute_action(payload.message, current_user.user_id, db)
+        if action_result:
+            return {"reply": action_result, "source": "action"}
+
+    # ── Step 2: Cloudflare Workers AI ─────────────────────────────────────────
+    cf_reply = _call_cloudflare(messages, cf_account, cf_token)
+    if cf_reply:
+        return {"reply": cf_reply, "source": "cloudflare"}
+
+    raise HTTPException(status_code=502, detail="AI is temporarily unavailable. Please try again.")

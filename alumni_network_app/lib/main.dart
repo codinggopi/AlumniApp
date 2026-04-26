@@ -31,6 +31,7 @@ import 'screens/dashboard/alumni_leaderboard_screen.dart';
 import 'screens/dashboard/alumni_mentorship_screen.dart';
 import 'screens/feedback/feedback_screen.dart';
 import 'screens/todo/todo_screen.dart';
+import 'screens/ai/ai_chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -312,9 +313,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   late List<Widget> _screens;
+  late AnimationController _fabAnimController;
+  late Animation<double> _fabFloatAnim;
 
   @override
   void initState() {
@@ -327,6 +330,14 @@ class _HomeScreenState extends State<HomeScreen> {
       const EventsListScreen(),
       const InboxScreen(),
     ];
+    // Floating animation: up and down loop
+    _fabAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _fabFloatAnim = Tween<double>(begin: 0, end: -10).animate(
+      CurvedAnimation(parent: _fabAnimController, curve: Curves.easeInOut),
+    );
     // Start polling only after auth is confirmed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -339,6 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _fabAnimController.dispose();
     Provider.of<MessageCountProvider>(context, listen: false).stopPolling();
     Provider.of<NotificationProvider>(context, listen: false).stopPolling();
     super.dispose();
@@ -350,6 +362,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _screens),
+      floatingActionButton: AnimatedBuilder(
+        animation: _fabFloatAnim,
+        builder: (_, __) => Transform.translate(
+          offset: Offset(0, _fabFloatAnim.value),
+          child: GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiChatScreen())),
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withValues(alpha: 0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.45),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 28),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
