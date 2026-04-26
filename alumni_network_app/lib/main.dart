@@ -391,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,

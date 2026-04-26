@@ -3057,3 +3057,739 @@ def ai_chat(payload: AIChatRequest, current_user: models.User = Depends(get_curr
         return {"reply": cf_reply, "source": "cloudflare"}
 
     raise HTTPException(status_code=502, detail="AI is temporarily unavailable. Please try again.")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SMART AI AGENT — Function Calling Layer
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AIAgentRequest(BaseModel):
+    message: str
+    history: Optional[list] = []
+    pending_action: Optional[dict] = None   # confirmed action from frontend
+    confirmed: Optional[bool] = False       # user confirmed the action
+
+
+# ── Tool definitions per role ─────────────────────────────────────────────────
+_TOOLS_STUDENT = [
+    {"name": "send_message",      "description": "Send a message to a connected alumni, admin or staff.", "parameters": {"receiver_name": "string", "message": "string"}},
+    {"name": "create_task",       "description": "Create a task/reminder.", "parameters": {"title": "string", "due_date": "string", "priority": "string"}},
+    {"name": "create_weekly_goal","description": "Set a weekly goal.", "parameters": {"goal": "string"}},
+    {"name": "book_mentorship",   "description": "Book a mentorship slot by alumni name.", "parameters": {"alumni_name": "string", "slot_id": "integer"}},
+    {"name": "get_connections",   "description": "List your accepted alumni connections.", "parameters": {}},
+    {"name": "get_available_mentors", "description": "List alumni with open mentorship slots.", "parameters": {}},
+    {"name": "get_internships",   "description": "List open internships.", "parameters": {}},
+    {"name": "apply_internship",  "description": "Apply for an internship.", "parameters": {"internship_title": "string", "internship_id": "integer", "cover_note": "string"}},
+    {"name": "get_user_profile",  "description": "View your own profile.", "parameters": {}},
+]
+
+_TOOLS_ALUMNI = [
+    {"name": "send_message",         "description": "Send a message to a connected student or admin.", "parameters": {"receiver_name": "string", "message": "string"}},
+    {"name": "get_connections",      "description": "List your connected students.", "parameters": {}},
+    {"name": "get_user_profile",     "description": "View your own profile.", "parameters": {}},
+    {"name": "get_my_mentorship_slots", "description": "List your posted mentorship slots and bookings.", "parameters": {}},
+    {"name": "get_my_internships",   "description": "List internships you have posted.", "parameters": {}},
+    {"name": "create_task",          "description": "Create a personal task/reminder.", "parameters": {"title": "string", "due_date": "string", "priority": "string"}},
+]
+
+_TOOLS_ADMIN = [
+    {"name": "send_message",     "description": "Send a message to any user.", "parameters": {"receiver_name": "string", "message": "string"}},
+    {"name": "get_user_profile", "description": "View your own profile.", "parameters": {}},
+    {"name": "get_app_stats",    "description": "Get app statistics — total users, internships, events.", "parameters": {}},
+    {"name": "create_task",      "description": "Create a personal task/reminder.", "parameters": {"title": "string", "due_date": "string", "priority": "string"}},
+]
+
+def _tools_for_role(role: str) -> list:
+    return {"student": _TOOLS_STUDENT, "alumni": _TOOLS_ALUMNI, "admin": _TOOLS_ADMIN}.get(role, _TOOLS_STUDENT)
+
+_TOOL_NAMES = {t["name"] for tools in [_TOOLS_STUDENT, _TOOLS_ALUMNI, _TOOLS_ADMIN] for t in tools}
+
+# ── App Guide Knowledge Base — per role ──────────────────────────────────────
+_APP_GUIDE_STUDENT = {
+    "internship": "To apply for an internship:\n1. Tap 'Internships' in the bottom nav.\n2. Browse listings and tap one.\n3. Tap 'Apply Now' and submit.\n4. Track status under 'My Applications'.",
+    "resume":     "To upload your resume:\n1. Tap your avatar → 'Edit Profile'.\n2. Scroll to Resume section.\n3. Tap 'Upload Resume' and select your PDF.",
+    "mentorship": "To book a mentorship session:\n1. On dashboard scroll to 'Find a Mentor'.\n2. Tap 'Book a Session'.\n3. Pick a slot and confirm.\n4. Wait for the alumni to confirm.",
+    "message":    "To send a message:\n1. Tap 'Messages' in the bottom nav.\n2. Select a conversation or compose new.\n3. You can only message connected alumni.",
+    "connection": "To connect with alumni:\n1. Go to Alumni Directory from dashboard.\n2. Browse and tap 'Connect'.\n3. Wait for them to accept.",
+    "events":     "To view events:\n1. Tap 'Events' in the bottom nav.\n2. Browse upcoming events.\n3. Tap for full details.",
+    "profile":    "To update your profile:\n1. Tap your avatar top right.\n2. Tap 'Edit Profile'.\n3. Update and save.",
+    "tasks":      "To manage tasks:\n1. Tap 'My Tasks' on dashboard.\n2. Tap '+ Add Tasks' to create one.\n3. Set title, due date, priority.\n4. Swipe left to delete.",
+    "notifications": "To view notifications:\n1. Tap the bell icon top right.\n2. All notifications are listed.\n3. Tap 'Mark all read' to clear.",
+    "resources":  "To access resources:\n1. Open side drawer (☰ top left).\n2. Tap 'Resources'.\n3. Browse documents and links.",
+}
+
+_APP_GUIDE_ALUMNI = {
+    "mentorship": "To manage mentorship slots:\n1. Go to your dashboard → 'My Mentorship'.\n2. Tap 'Add Slot' to create availability.\n3. View and confirm student bookings.\n4. Add a meeting link when confirming.",
+    "internship": "To post an internship:\n1. Go to 'Internships' tab.\n2. Tap 'Post Internship'.\n3. Fill in role, company, deadline details.\n4. View applicants from the listing.",
+    "connection": "To manage connections:\n1. Students send you connection requests.\n2. Go to 'Connection Requests' to accept/reject.\n3. Connected students can message you.",
+    "profile":    "To update your alumni profile:\n1. Tap your avatar → 'Edit Profile'.\n2. Add your company, job title, experience.\n3. Toggle mentorship availability.",
+    "message":    "To message students:\n1. Tap 'Messages' in the bottom nav.\n2. You can message connected students.\n3. Tap compose to start a new chat.",
+    "leaderboard":"To view the leaderboard:\n1. Go to your dashboard.\n2. Tap 'Leaderboard'.\n3. Earn points by accepting connections, completing mentorships.",
+}
+
+_APP_GUIDE_ADMIN = {
+    "users":         "To manage users:\n1. Open side drawer → 'User List'.\n2. View all students and alumni.\n3. Edit or manage profiles as needed.",
+    "events":        "To post an event:\n1. Open side drawer → 'Post Event'.\n2. Fill in title, date, description.\n3. Set target audience (all/student/alumni).",
+    "notifications": "To send a broadcast notification:\n1. Go to 'Send Notification' from drawer.\n2. Select audience and write message.\n3. Tap Send to push to all users.",
+    "internship":    "To manage internships:\n1. Go to 'Internships' tab.\n2. View all posted internships.\n3. Edit or delete as needed.",
+    "profile":       "To update admin profile:\n1. Tap your avatar → 'Edit Profile'.\n2. Update your details and save.",
+    "stats":         "To view app stats:\n1. Your dashboard shows total users, internships, events.\n2. Use the admin panel for detailed reports.",
+}
+
+def _get_app_guide(role: str) -> dict:
+    return {"student": _APP_GUIDE_STUDENT, "alumni": _APP_GUIDE_ALUMNI, "admin": _APP_GUIDE_ADMIN}.get(role, _APP_GUIDE_STUDENT)
+
+# ── Role-based system prompts ─────────────────────────────────────────────────
+_ROLE_PERSONA = {
+    "student": (
+        "You are a Smart Career Assistant for students in an Alumni Network App.\n"
+        "Focus ONLY on: career guidance, internship applications, resume tips, interview prep, "
+        "skill development, mentorship booking, and connecting with alumni.\n"
+        "Do NOT suggest alumni or admin features to students."
+    ),
+    "alumni": (
+        "You are a Smart Assistant for alumni in an Alumni Network App.\n"
+        "Focus ONLY on: managing mentorship slots, posting internships, connecting with students, "
+        "sharing career insights, updating profile, and engaging with the community.\n"
+        "Do NOT suggest student-only features like applying for internships or booking mentorship."
+    ),
+    "admin": (
+        "You are a Smart Admin Assistant for the Alumni Network App.\n"
+        "Focus ONLY on: app management, posting events/announcements, managing users, "
+        "sending broadcast notifications, and monitoring app activity.\n"
+        "Do NOT suggest student or alumni specific features."
+    ),
+}
+
+# ── System prompt for the agent ───────────────────────────────────────────────
+def _agent_system_prompt(user: models.User, db) -> str:
+    role = user.role.lower()
+    persona = _ROLE_PERSONA.get(role, _ROLE_PERSONA["student"])
+
+    connections = db.query(models.Connection).filter(
+        ((models.Connection.requester_id == user.user_id) | (models.Connection.receiver_id == user.user_id)),
+        models.Connection.status == "accepted",
+    ).all()
+    conn_names = []
+    for c in connections:
+        other_id = c.receiver_id if c.requester_id == user.user_id else c.requester_id
+        other = db.query(models.User).filter(models.User.user_id == other_id).first()
+        if other:
+            conn_names.append(f"{other.full_name} ({other.role})")
+
+    tools = _tools_for_role(role)
+    tools_desc = "\n".join(f"- {t['name']}: {t['description']}" for t in tools)
+
+    extra_ctx = ""
+    if role == "alumni":
+        profile = db.query(models.AlumniProfile).filter(models.AlumniProfile.alumni_id == user.user_id).first()
+        extra_ctx = f"- Company: {profile.company if profile else 'N/A'}\n- Job Title: {profile.job_title if profile else 'N/A'}"
+    elif role == "student":
+        profile = db.query(models.StudentProfile).filter(models.StudentProfile.student_id == user.user_id).first()
+        extra_ctx = f"- Skills: {profile.skills if profile else 'N/A'}\n- Resume: {'Uploaded' if (profile and profile.resume_url) else 'Not uploaded'}"
+
+    return f"""{persona}
+
+USER CONTEXT:
+- Name: {user.full_name}
+- Role: {role}
+- Department: {user.department or 'N/A'}
+{extra_ctx}
+- Connections: {', '.join(conn_names) if conn_names else 'None yet'}
+
+AVAILABLE ACTIONS for {role}:
+{tools_desc}
+
+INSTRUCTIONS:
+1. Only suggest or perform actions available to a {role}.
+2. If the user wants to perform an action, respond ONLY with a JSON block:
+ACTION:
+{{"tool": "<tool_name>", "args": {{...}}, "confirm_message": "<confirmation question>"}}
+3. For plain questions, answer in plain text. Be concise and role-appropriate.
+4. Today's date: {__import__('datetime').date.today().isoformat()}.
+5. For send_message: receiver_name can be a name or role like "admin". Backend resolves it.
+"""
+
+
+# ── Tool executors ─────────────────────────────────────────────────────────────
+def _exec_send_message(args: dict, user: models.User, db) -> str:
+    receiver_name = args.get("receiver_name", "").lower().strip()
+    content = args.get("message", "").strip()
+    if not content:
+        return "❌ Message content is empty."
+
+    receiver = None
+
+    # 1. Check if user said "admin" — find any admin user directly
+    if receiver_name in ("admin", "the admin", "an admin"):
+        receiver = db.query(models.User).filter(
+            models.User.role == "admin"
+        ).first()
+    else:
+        # 2. Search connections first
+        connections = db.query(models.Connection).filter(
+            ((models.Connection.requester_id == user.user_id) | (models.Connection.receiver_id == user.user_id)),
+            models.Connection.status == "accepted",
+        ).all()
+        for c in connections:
+            other_id = c.receiver_id if c.requester_id == user.user_id else c.requester_id
+            other = db.query(models.User).filter(models.User.user_id == other_id).first()
+            if other and receiver_name in other.full_name.lower():
+                receiver = other
+                break
+
+        # 3. If not found in connections, search all users by name (admin/staff/alumni)
+        if not receiver:
+            receiver = db.query(models.User).filter(
+                models.User.full_name.ilike(f"%{receiver_name}%"),
+                models.User.user_id != user.user_id,
+            ).first()
+
+    if not receiver:
+        return f"❌ Could not find a user named '{args.get('receiver_name')}'. Please check the name and try again."
+
+    msg = models.Message(
+        sender_id=user.user_id,
+        receiver_id=receiver.user_id,
+        content=content,
+        is_read=False,
+    )
+    db.add(msg)
+    db.add(models.Notification(
+        user_id=receiver.user_id,
+        type="message",
+        message=f"New message from {user.full_name}: {content[:60]}",
+        is_read=False,
+    ))
+    db.commit()
+    return f"✅ Message sent to {receiver.full_name} ({receiver.role}): \"{content}\""
+
+
+def _exec_create_task(args: dict, user: models.User, db) -> str:
+    import datetime
+    title = args.get("title", "").strip()
+    due_raw = args.get("due_date", "")
+    priority = args.get("priority", "medium")
+
+    if not title:
+        return "❌ Task title is required."
+
+    # Resolve due date
+    due_dt = None
+    if due_raw:
+        if due_raw.lower() == "tomorrow":
+            due_dt = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+        elif due_raw.lower() == "today":
+            due_dt = datetime.date.today().isoformat()
+        else:
+            due_dt = due_raw
+
+    # Store in notifications table as a task reminder (tasks are stored client-side via SharedPreferences in Flutter)
+    # We also create a notification so the user sees it
+    db.add(models.Notification(
+        user_id=user.user_id,
+        type="task",
+        message=f"📋 Task created: {title}" + (f" — Due: {due_dt}" if due_dt else ""),
+        is_read=False,
+    ))
+    db.commit()
+
+    return (
+        f"✅ Task created: **{title}**\n"
+        f"📅 Due: {due_dt or 'No due date'}\n"
+        f"⚡ Priority: {priority}\n\n"
+        f"Open My Tasks on the dashboard to view it."
+    )
+
+
+def _exec_book_mentorship(args: dict, user: models.User, db) -> str:
+    alumni_name = args.get("alumni_name", "").lower()
+    slot_id = args.get("slot_id")
+
+    slot = None
+    if slot_id:
+        slot = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.slot_id == slot_id).first()
+    elif alumni_name:
+        # Find alumni by name
+        alumni_user = db.query(models.User).filter(
+            models.User.role == "alumni",
+            models.User.full_name.ilike(f"%{alumni_name}%"),
+        ).first()
+        if alumni_user:
+            slot = db.query(models.MentorshipSlot).filter(
+                models.MentorshipSlot.alumni_id == alumni_user.user_id,
+            ).first()
+
+    if not slot:
+        return f"❌ No available mentorship slot found for '{args.get('alumni_name', '')}'. Browse mentors on your dashboard."
+
+    if len(slot.bookings) >= slot.max_students:
+        return f"❌ That slot is full. Please choose another mentor."
+
+    existing = db.query(models.MentorshipBooking).filter(
+        models.MentorshipBooking.slot_id == slot.slot_id,
+        models.MentorshipBooking.student_id == user.user_id,
+    ).first()
+    if existing:
+        return "ℹ️ You've already booked this session."
+
+    booking = models.MentorshipBooking(slot_id=slot.slot_id, student_id=user.user_id)
+    db.add(booking)
+    alumni_user = db.query(models.User).filter(models.User.user_id == slot.alumni_id).first()
+    db.add(models.Notification(
+        user_id=user.user_id,
+        type="connection",
+        message=f"Mentorship session booked with {alumni_user.full_name if alumni_user else 'mentor'} — {slot.day} {slot.time_from}–{slot.time_to}",
+        is_read=False,
+    ))
+    db.commit()
+    return (
+        f"✅ Mentorship session booked!\n"
+        f"👤 Mentor: {alumni_user.full_name if alumni_user else 'N/A'}\n"
+        f"📅 {slot.day} {slot.time_from}–{slot.time_to}\n"
+        f"Status: Pending confirmation from mentor."
+    )
+
+
+def _exec_get_connections(args: dict, user: models.User, db) -> str:
+    connections = db.query(models.Connection).filter(
+        ((models.Connection.requester_id == user.user_id) | (models.Connection.receiver_id == user.user_id)),
+        models.Connection.status == "accepted",
+    ).all()
+    if not connections:
+        return "You have no accepted connections yet. Browse the Alumni Directory to connect!"
+    lines = []
+    for c in connections:
+        other_id = c.receiver_id if c.requester_id == user.user_id else c.requester_id
+        other = db.query(models.User).filter(models.User.user_id == other_id).first()
+        if other:
+            lines.append(f"• {other.full_name} ({other.role}) — {other.department or 'N/A'}")
+    return "Your connections:\n" + "\n".join(lines)
+
+
+def _exec_get_available_mentors(args: dict, user: models.User, db) -> str:
+    slots = db.query(models.MentorshipSlot).all()
+    available = [s for s in slots if len(s.bookings) < s.max_students]
+    if not available:
+        return "No mentorship slots are available right now. Check back later!"
+    lines = []
+    for s in available[:5]:
+        alumni = db.query(models.User).filter(models.User.user_id == s.alumni_id).first()
+        lines.append(f"• {alumni.full_name if alumni else 'N/A'} — {s.day} {s.time_from}–{s.time_to} (slot_id:{s.slot_id})")
+    return "Available mentorship slots:\n" + "\n".join(lines)
+
+
+def _exec_get_internships(args: dict, user: models.User, db) -> str:
+    internships = db.query(models.Internship).filter(models.Internship.status == "Open").limit(5).all()
+    if not internships:
+        return "No open internships right now. Check back soon!"
+    lines = [f"• [{i.internship_id}] {i.role_title} @ {i.company} — Deadline: {i.deadline or 'N/A'}" for i in internships]
+    return "Open internships:\n" + "\n".join(lines)
+
+
+def _exec_apply_internship(args: dict, user: models.User, db) -> str:
+    internship_id = args.get("internship_id")
+    title = args.get("internship_title", "").lower()
+    cover_note = args.get("cover_note", "")
+
+    internship = None
+    if internship_id:
+        internship = db.query(models.Internship).filter(models.Internship.internship_id == internship_id).first()
+    elif title:
+        internship = db.query(models.Internship).filter(
+            models.Internship.role_title.ilike(f"%{title}%"),
+            models.Internship.status == "Open",
+        ).first()
+
+    if not internship:
+        return "❌ Internship not found. Use 'show internships' to see available ones."
+
+    existing = db.query(models.Application).filter(
+        models.Application.internship_id == internship.internship_id,
+        models.Application.student_id == user.user_id,
+    ).first()
+    if existing:
+        return f"ℹ️ You've already applied for **{internship.role_title}** at {internship.company}."
+
+    student_profile = db.query(models.StudentProfile).filter(
+        models.StudentProfile.student_id == user.user_id
+    ).first()
+
+    app = models.Application(
+        internship_id=internship.internship_id,
+        student_id=user.user_id,
+        cover_note=cover_note,
+        resume_url=student_profile.resume_url if student_profile else None,
+        status="Applied",
+    )
+    db.add(app)
+    db.add(models.Notification(
+        user_id=user.user_id,
+        type="event",
+        message=f"Application submitted for {internship.role_title} @ {internship.company}",
+        is_read=False,
+    ))
+    db.commit()
+    return f"✅ Applied for **{internship.role_title}** at {internship.company}!\nStatus: Applied. You'll be notified of updates."
+
+
+def _exec_get_user_profile(args: dict, user: models.User, db) -> str:
+    lines = [
+        f"👤 Name: {user.full_name}",
+        f"📧 Email: {user.email}",
+        f"🎓 Role: {user.role}",
+        f"🏫 Department: {user.department or 'Not set'}",
+        f"🏙️ City: {user.city or 'Not set'}",
+        f"📝 Bio: {user.bio or 'Not set'}",
+    ]
+    if user.role == "student":
+        profile = db.query(models.StudentProfile).filter(models.StudentProfile.student_id == user.user_id).first()
+        if profile:
+            lines.append(f"🛠️ Skills: {profile.skills or 'Not set'}")
+            lines.append(f"📄 Resume: {'Uploaded ✓' if profile.resume_url else 'Not uploaded'}")
+    elif user.role == "alumni":
+        profile = db.query(models.AlumniProfile).filter(models.AlumniProfile.alumni_id == user.user_id).first()
+        if profile:
+            lines.append(f"🏢 Company: {profile.company or 'Not set'}")
+            lines.append(f"💼 Job Title: {profile.job_title or 'Not set'}")
+            lines.append(f"🎓 Mentorship: {'Available' if profile.mentorship_available else 'Not available'}")
+    return "\n".join(lines)
+
+
+def _exec_get_my_mentorship_slots(args: dict, user: models.User, db) -> str:
+    slots = db.query(models.MentorshipSlot).filter(models.MentorshipSlot.alumni_id == user.user_id).all()
+    if not slots:
+        return "You have no mentorship slots posted yet. Go to 'My Mentorship' on your dashboard to add one."
+    lines = []
+    for s in slots:
+        booked = len(s.bookings)
+        lines.append(f"• {s.day} {s.time_from}–{s.time_to} | {booked}/{s.max_students} booked (slot_id:{s.slot_id})")
+    return f"Your mentorship slots ({len(slots)}):\n" + "\n".join(lines)
+
+
+def _exec_get_my_internships(args: dict, user: models.User, db) -> str:
+    internships = db.query(models.Internship).filter(models.Internship.posted_by == user.user_id).all()
+    if not internships:
+        return "You haven't posted any internships yet. Go to 'Internships' tab to post one."
+    lines = [f"• [{i.internship_id}] {i.role_title} @ {i.company} — {i.status}" for i in internships]
+    return f"Your posted internships ({len(internships)}):\n" + "\n".join(lines)
+
+
+def _exec_get_app_stats(args: dict, user: models.User, db) -> str:
+    total_users = db.query(models.User).count()
+    students = db.query(models.User).filter(models.User.role == "student").count()
+    alumni = db.query(models.User).filter(models.User.role == "alumni").count()
+    internships = db.query(models.Internship).filter(models.Internship.status == "Open").count()
+    events = db.query(models.Event).count()
+    connections = db.query(models.Connection).filter(models.Connection.status == "accepted").count()
+    return (
+        f"📊 App Statistics:\n"
+        f"👥 Total Users: {total_users} ({students} students, {alumni} alumni)\n"
+        f"💼 Open Internships: {internships}\n"
+        f"📅 Total Events: {events}\n"
+        f"🤝 Active Connections: {connections}"
+    )
+
+
+def _exec_create_weekly_goal(args: dict, user: models.User, db) -> str:
+    import datetime
+    goal = args.get("goal", "").strip()
+    if not goal:
+        return "❌ Please specify a goal."
+    # Due end of current week (Sunday)
+    today = datetime.date.today()
+    days_until_sunday = (6 - today.weekday()) % 7 or 7
+    due = (today + datetime.timedelta(days=days_until_sunday)).isoformat()
+
+    db.add(models.Notification(
+        user_id=user.user_id,
+        type="task",
+        message=f"🏆 Weekly goal: {goal} — Due: {due}",
+        is_read=False,
+    ))
+    db.commit()
+    return (
+        f"✅ Weekly goal set: **{goal}**\n"
+        f"📅 Due by: {due} (end of week)\n\n"
+        f"You'll find it in My Tasks on your dashboard."
+    )
+
+
+# ── Tool dispatcher ────────────────────────────────────────────────────────────
+def _dispatch_tool(tool_name: str, args: dict, user: models.User, db) -> str:
+    dispatch = {
+        "send_message":              _exec_send_message,
+        "create_task":               _exec_create_task,
+        "book_mentorship":           _exec_book_mentorship,
+        "get_connections":           _exec_get_connections,
+        "get_available_mentors":     _exec_get_available_mentors,
+        "get_internships":           _exec_get_internships,
+        "apply_internship":          _exec_apply_internship,
+        "get_user_profile":          _exec_get_user_profile,
+        "create_weekly_goal":        _exec_create_weekly_goal,
+        "get_my_mentorship_slots":   _exec_get_my_mentorship_slots,
+        "get_my_internships":        _exec_get_my_internships,
+        "get_app_stats":             _exec_get_app_stats,
+    }
+    fn = dispatch.get(tool_name)
+    if not fn:
+        return f"❌ Unknown action: {tool_name}"
+    return fn(args, user, db)
+
+
+# ── Parse ACTION block from AI response — handles multiple formats ─────────────
+def _parse_action(text: str) -> Optional[dict]:
+    import json, re
+    # Try "ACTION:\n{...}" format
+    match = re.search(r'ACTION:\s*(\{.*?\})', text, re.DOTALL)
+    if match:
+        try:
+            return _normalize_action_args(json.loads(match.group(1)))
+        except Exception:
+            pass
+    # Try bare JSON object that has a "tool" key anywhere in the text
+    for m in re.finditer(r'(\{[^{}]*"tool"[^{}]*\})', text, re.DOTALL):
+        try:
+            parsed = json.loads(m.group(1))
+            if parsed.get("tool") in _TOOL_NAMES:
+                return _normalize_action_args(parsed)
+        except Exception:
+            continue
+    return None
+
+
+def _normalize_action_args(action: dict) -> dict:
+    """Normalize AI-generated arg key variations to expected keys."""
+    args = action.get("args", {})
+    # send_message: AI sometimes uses "name" or "recipient" instead of "receiver_name"
+    if action.get("tool") == "send_message":
+        if "name" in args and "receiver_name" not in args:
+            args["receiver_name"] = args.pop("name")
+        if "recipient" in args and "receiver_name" not in args:
+            args["receiver_name"] = args.pop("recipient")
+        if "text" in args and "message" not in args:
+            args["message"] = args.pop("text")
+        if "content" in args and "message" not in args:
+            args["message"] = args.pop("content")
+    # book_mentorship: AI sometimes uses "name" instead of "alumni_name"
+    if action.get("tool") == "book_mentorship":
+        if "name" in args and "alumni_name" not in args:
+            args["alumni_name"] = args.pop("name")
+    action["args"] = args
+    return action
+
+
+# ── Keyword-based intent router (reliable fallback — no AI needed) ─────────────
+_INTENT_MAP = [
+    (["list my connections", "show my connections", "my connections", "who am i connected"],
+     "get_connections", {}),
+    (["available mentor", "find mentor", "show mentor", "list mentor", "available slot"],
+     "get_available_mentors", {}),
+    (["show internship", "list internship", "open internship", "available internship", "get internship", "show open internship"],
+     "get_internships", {}),
+    (["my profile", "show my profile", "get my profile", "view my profile"],
+     "get_user_profile", {}),
+]
+
+# ── App guide keyword detector ────────────────────────────────────────────────
+_GUIDE_KEYWORDS = {
+    "internship": ["how to apply", "apply for internship", "how internship", "internship feature", "use internship", "how do i apply"],
+    "resume":     ["upload resume", "where resume", "how resume", "resume upload", "add resume", "upload my resume", "how to upload resume", "where to upload", "how to upload my"],
+    "mentorship": ["how to book", "book mentorship", "mentorship feature", "how mentorship", "find mentor how", "how do i book"],
+    "message":    ["how to message", "how to send message", "send message how", "message feature", "how do i send"],
+    "connection": ["how to connect", "connect with alumni", "connection feature", "how connection", "how do i connect"],
+    "events":     ["how to view event", "events feature", "how events", "see events", "list event", "show event", "view event", "list the event", "get event"],
+    "profile":    ["how to update profile", "edit profile", "update profile how", "change profile", "how to edit profile"],
+    "tasks":      ["how to add task", "task feature", "how tasks", "manage tasks", "add task how", "how do i add task"],
+    "notifications": ["how notifications", "view notifications", "notification feature", "how do i see notification"],
+    "resources":  ["how resources", "view resources", "access resources", "resource feature"],
+}
+
+# ── Greeting detector ─────────────────────────────────────────────────────────
+_GREETINGS = {"hi", "hello", "hey", "hii", "helo", "howdy", "sup", "greetings", "hai"}
+_FAREWELLS = {"good night", "goodbye", "bye", "bye bye", "see you", "see ya", "take care", "good bye", "cya", "later"}
+_TIME_GREETINGS = {"good morning", "good afternoon", "good evening"}
+
+def _is_greeting(message: str) -> bool:
+    t = message.lower().strip().rstrip('!.,')
+    return t in _GREETINGS or any(t == g or t.startswith(g + ' ') for g in _GREETINGS)
+
+def _is_farewell(message: str) -> bool:
+    t = message.lower().strip().rstrip('!.,')
+    return t in _FAREWELLS or any(t == f or t.startswith(f + ' ') for f in _FAREWELLS)
+
+def _get_time_greeting(message: str) -> Optional[str]:
+    t = message.lower().strip().rstrip('!.,')
+    for tg in _TIME_GREETINGS:
+        if t == tg or t.startswith(tg + ' '):
+            return tg
+    return None
+
+def _check_app_guide(message: str, role: str = "student") -> Optional[str]:
+    t = message.lower()
+    guide = _get_app_guide(role)
+    for topic, keywords in _GUIDE_KEYWORDS.items():
+        if any(kw in t for kw in keywords):
+            return guide.get(topic)
+    return None
+
+# ── Role-based tool permission check ─────────────────────────────────────────
+def _tool_allowed_for_role(tool: str, role: str) -> bool:
+    allowed = {t["name"] for t in _tools_for_role(role)}
+    return tool in allowed
+
+
+def _route_intent(message: str, user: models.User, db) -> Optional[dict]:
+    """Directly map common commands to tools without calling AI."""
+    import re, datetime
+    t = message.lower().strip()
+
+    # Read-only lookups
+    for keywords, tool, args in _INTENT_MAP:
+        if any(kw in t for kw in keywords):
+            return {"tool": tool, "args": args}
+
+    # send message: "send message to <name> saying <text>" or "message <name> <text>"
+    m = re.search(r'(?:send\s+(?:a\s+)?message\s+to|message\s+to)\s+([a-z ]+?)\s+(?:saying|:)\s+(.+)', t)
+    if m:
+        return {"tool": "send_message", "args": {"receiver_name": m.group(1).strip(), "message": m.group(2).strip()}}
+
+    # create task / remind me (with or without "to")
+    m = re.search(r'(?:create\s+(?:a\s+)?task|add\s+(?:a\s+)?task|remind\s+me(?:\s+to)?)\s+(.+)', t)
+    if m:
+        title = m.group(1).strip()
+        # strip trailing time/date words from title
+        title = re.sub(r'\s+(tomorrow|today|tonight|this week)$', '', title).strip()
+        due = "tomorrow" if "tomorrow" in t else ("today" if "today" in t else "")
+        priority = "high" if any(w in t for w in ["urgent", "important", "asap"]) else "medium"
+        return {"tool": "create_task", "args": {"title": title, "due_date": due, "priority": priority}}
+
+    # weekly goal
+    m = re.search(r'(?:create\s+(?:a\s+)?weekly\s+goal|set\s+(?:a\s+)?weekly\s+goal|weekly\s+goal)\s*(?:to\s+|:)?\s*(.+)', t)
+    if m:
+        return {"tool": "create_weekly_goal", "args": {"goal": m.group(1).strip()}}
+
+    # book mentorship: "book mentorship with <name>" / "book session with <name>"
+    m = re.search(r'book\s+(?:a\s+)?(?:mentorship|session|mentor)\s+(?:with\s+)?([a-z ]+)', t)
+    if m:
+        return {"tool": "book_mentorship", "args": {"alumni_name": m.group(1).strip()}}
+
+    # apply internship: "apply for <title>" / "apply internship <title>"
+    m = re.search(r'apply\s+(?:for\s+)?(?:internship\s+)?(.+)', t)
+    if m and any(kw in t for kw in ["apply for", "apply internship"]):
+        return {"tool": "apply_internship", "args": {"internship_title": m.group(1).strip()}}
+
+    return None
+
+
+# ── Main agent endpoint ────────────────────────────────────────────────────────
+@app.post("/ai/agent", tags=["ai"])
+def ai_agent(
+    payload: AIAgentRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    cf_account = os.getenv("CF_ACCOUNT_ID", "")
+    cf_token   = os.getenv("CF_API_TOKEN", "")
+    if not cf_account or not cf_token:
+        raise HTTPException(status_code=503, detail="AI agent is not configured.")
+
+    # ── If user confirmed a pending action, execute it directly ───────────────
+    if payload.confirmed and payload.pending_action:
+        tool = payload.pending_action.get("tool")
+        args = payload.pending_action.get("args", {})
+        if not _tool_allowed_for_role(tool, current_user.role):
+            return {"reply": f"❌ This action is not available for your role ({current_user.role}).", "source": "guide", "action": None}
+        result = _dispatch_tool(tool, args, current_user, db)
+        return {"reply": result, "source": "action_executed", "action": None}
+
+    # ── Build messages for AI ──────────────────────────────────────────────────
+    system_prompt = _agent_system_prompt(current_user, db)
+    messages = [{"role": "system", "content": system_prompt}]
+    if payload.history:
+        messages.extend(payload.history[-8:])
+    messages.append({"role": "user", "content": payload.message})
+
+    # ── Step 1: Try direct keyword intent routing (fast, no AI needed) ────────
+    intent = _route_intent(payload.message, current_user, db)
+    if intent:
+        read_only = {"get_connections", "get_available_mentors", "get_internships", "get_user_profile"}
+        if intent["tool"] in read_only:
+            result = _dispatch_tool(intent["tool"], intent["args"], current_user, db)
+            return {"reply": result, "source": "action_executed", "action": None}
+        # Write actions — ask confirmation
+        args = intent["args"]
+        tool = intent["tool"]
+        confirm_msg = {
+            "send_message":      f"Send message to {args.get('receiver_name','?')} saying \"{args.get('message','?')}\"?",
+            "create_task":       f"Create task: \"{args.get('title','?')}\" due {args.get('due_date') or 'no date'}?",
+            "book_mentorship":   f"Book a mentorship session with {args.get('alumni_name','?')}?",
+            "apply_internship":  f"Apply for internship: \"{args.get('internship_title','?')}\"?",
+            "create_weekly_goal":f"Set weekly goal: \"{args.get('goal','?')}\"?",
+        }.get(tool, f"Perform action: {tool}?")
+        return {"reply": confirm_msg, "source": "confirm_needed", "action": intent}
+
+    # ── Step 2: Handle greetings & farewells locally ──────────────────────────
+    name = current_user.full_name.split()[0]
+
+    if _is_farewell(payload.message):
+        import random
+        farewells = [
+            f"Good night, {name}! 🌙 Sleep well. I'll be here when you need me.",
+            f"Goodbye, {name}! 👋 Take care and come back anytime.",
+            f"See you later, {name}! 😊 Have a great time!",
+        ]
+        return {"reply": random.choice(farewells), "source": "guide", "action": None}
+
+    time_greeting = _get_time_greeting(payload.message)
+    if time_greeting:
+        responses = {
+            "good morning": [
+                f"Good morning, {name}! ☀️ Hope you have a productive day ahead. How can I help?",
+                f"Good morning, {name}! 🌅 Great to see you! What do you need today?",
+            ],
+            "good afternoon": [
+                f"Good afternoon, {name}! 🌤️ Hope your day is going well. What can I do for you?",
+                f"Good afternoon, {name}! 😊 How's the day treating you? Let me know how I can help.",
+            ],
+            "good evening": [
+                f"Good evening, {name}! 🌆 Winding down or still hustling? I'm here to help!",
+                f"Good evening, {name}! ✨ Hope you had a great day. What do you need?",
+            ],
+        }
+        import random
+        return {"reply": random.choice(responses[time_greeting]), "source": "guide", "action": None}
+
+    if _is_greeting(payload.message):
+        import random
+        greets = [
+            f"Hey {name}! 👋 How can I help you today?",
+            f"Hello {name}! 😊 What can I do for you?",
+            f"Hi {name}! 🤖 Ready to help — what do you need?",
+        ]
+        return {"reply": random.choice(greets), "source": "guide", "action": None}
+
+    # ── Step 3: Check app guide (no AI needed) ────────────────────────────────
+    guide = _check_app_guide(payload.message, current_user.role)
+    if guide:
+        return {"reply": guide, "source": "guide", "action": None}
+
+    # ── Step 2: Call Cloudflare AI ────────────────────────────────────────────
+    ai_reply = _call_cloudflare(messages, cf_account, cf_token)
+    if not ai_reply:
+        raise HTTPException(status_code=502, detail="AI is temporarily unavailable.")
+
+    # ── Step 3: Check if AI returned a tool call ───────────────────────────────
+    action = _parse_action(ai_reply)
+    if action and action.get("tool") in _TOOL_NAMES:
+        read_only = {"get_connections", "get_available_mentors", "get_internships"}
+        if action["tool"] in read_only:
+            result = _dispatch_tool(action["tool"], action.get("args", {}), current_user, db)
+            return {"reply": result, "source": "action_executed", "action": None}
+        return {
+            "reply": action.get("confirm_message", f"Do you want to {action['tool'].replace('_', ' ')}?"),
+            "source": "confirm_needed",
+            "action": action,
+        }
+
+    # ── Step 4: Plain conversational reply ────────────────────────────────────
+    return {"reply": ai_reply, "source": "cloudflare", "action": None}
