@@ -255,23 +255,28 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _animationFinished = false;
-  bool _authChecked = false;
+  // Three states: splash → loading (if needed) → home/login
+  bool _animationDone = false;
+  bool _authDone = false;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _runAnimation();
+    _runAuthCheck();
     _requestPermissions();
   }
 
-  Future<void> _init() async {
-    // Run animation timer and auth check in parallel
-    await Future.wait([
-      Future.delayed(const Duration(seconds: 4)),
-      Provider.of<AuthProvider>(context, listen: false).checkAuth(),
-    ]);
-    if (mounted) setState(() { _animationFinished = true; _authChecked = true; });
+  // Animation runs for exactly 3.5s — never blocked by network
+  Future<void> _runAnimation() async {
+    await Future.delayed(const Duration(milliseconds: 3500));
+    if (mounted) setState(() => _animationDone = true);
+  }
+
+  // Auth check runs independently in background
+  Future<void> _runAuthCheck() async {
+    await Provider.of<AuthProvider>(context, listen: false).checkAuth();
+    if (mounted) setState(() => _authDone = true);
   }
 
   Future<void> _requestPermissions() async {
@@ -281,12 +286,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // Show splash until BOTH animation is done AND auth check is complete
-    if (!_animationFinished || !_authChecked) return const animated.SplashScreen();
+    // Phase 1: Animation still playing — always show splash
+    if (!_animationDone) return const animated.SplashScreen();
 
+    // Phase 2: Animation done but auth still pending — show loading
+    if (!_authDone) return const animated.SplashLoadingScreen();
+
+    // Phase 3: Both done — navigate with fade transition
     final auth = Provider.of<AuthProvider>(context);
-    if (auth.isAuthenticated) return const HomeScreen();
-    return const LoginScreen();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      child: auth.isAuthenticated
+          ? const HomeScreen(key: ValueKey('home'))
+          : const LoginScreen(key: ValueKey('login')),
+    );
   }
 }
 
