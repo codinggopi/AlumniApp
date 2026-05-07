@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://alumni-app-virid.vercel.app';
+  // static const String baseUrl = 'https://alumni-app-virid.vercel.app';
+  static const String baseUrl = 'https://alumininetwork.gunagvgg.xyz/';
   // static const String baseUrl = 'https://callum-unstigmatic-yappingly.ngrok-free.dev';
 
   static const String _tokenKey = 'access_token';
